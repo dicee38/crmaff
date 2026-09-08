@@ -7,11 +7,26 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, require_roles
 from app.core.rbac import CAN_ASSIGN_MANAGER, CAN_EDIT_LEAD, CAN_VIEW_ALL_LEADS
+from app.crud.affiliate_event import list_affiliate_events_by_lead
+from app.crud.communication import list_communications_by_lead
 from app.crud.lead import create_lead, get_lead, list_leads, update_lead
+from app.crud.tracking_event import get_first_click_event
+from app.crud.user import get_user
 from app.database import get_db
 from app.models.enums import UserRole
 from app.models.user import User
-from app.schemas.lead import LeadAssign, LeadCreate, LeadListResponse, LeadOut, LeadUpdate
+from app.schemas.affiliate_event import AffiliateEventOut
+from app.schemas.communication import CommunicationListResponse, CommunicationOut
+from app.schemas.lead import (
+    AcquisitionInfo,
+    LeadAssign,
+    LeadCardOut,
+    LeadCreate,
+    LeadListResponse,
+    LeadOut,
+    LeadUpdate,
+    ManagerSummary,
+)
 from app.services.audit import write_audit_log
 
 router = APIRouter(prefix="/leads", tags=["leads"])
@@ -139,6 +154,58 @@ async def update_lead_endpoint(
     )
     await db.commit()
     return LeadOut.model_validate(lead)
+
+
+@router.get("/{lead_id}/card", response_model=LeadCardOut)
+async def get_lead_card_endpoint(
+    lead_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> LeadCardOut:
+    """Карточка лида: профиль, acquisition, менеджер, communication, affiliate (DoD Sprint 2)."""
+    lead = await _get_lead_or_404(db, lead_id)
+    _assert_can_view(current_user, lead)
+
+    first_click = await get_first_click_event(db, lead_id)
+    acquisition = AcquisitionInfo(
+        source_channel=lead.source_channel,
+        click_id=first_click.click_id if first_click else lead.external_click_id,
+        campaign_id=first_click.campaign_id if first_click else None,
+        adset_id=first_click.adset_id if first_click else None,
+        creative_id=first_click.creative_id if first_click else None,
+        landing_id=first_click.landing_id if first_click else None,
+        first_seen_at=first_click.event_timestamp if first_click else lead.created_at,
+    )
+
+    manager = None
+    if lead.assigned_manager_id is not None:
+        manager_user = await get_user(db, lead.assigned_manager_id)
+        if manager_user is not None:
+            manager = ManagerSummary.model_validate(manager_user)
+
+    communications = await list_communications_by_lead(db, lead_id)
+    affiliate_events = await list_affiliate_events_by_lead(db, lead_id)
+
+    return LeadCardOut(
+        profile=LeadOut.model_validate(lead),
+        acquisition=acquisition,
+        manager=manager,
+        communications=[CommunicationOut.model_validate(c) for c in communications],
+        affiliate=[AffiliateEventOut.model_validate(e) for e in affiliate_events],
+    )
+
+
+@router.get("/{lead_id}/communications", response_model=CommunicationListResponse)
+async def list_lead_communications_endpoint(
+    lead_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> CommunicationListResponse:
+    lead = await _get_lead_or_404(db, lead_id)
+    _assert_can_view(current_user, lead)
+
+    communications = await list_communications_by_lead(db, lead_id)
+    return CommunicationListResponse(items=[CommunicationOut.model_validate(c) for c in communications])
 
 
 @router.post("/{lead_id}/assign", response_model=LeadOut)

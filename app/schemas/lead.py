@@ -4,6 +4,8 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from app.models.enums import ConsentStatus, Dialect, LeadStatus, SourceChannel
+from app.schemas.affiliate_event import AffiliateEventOut
+from app.schemas.communication import CommunicationOut
 
 
 class LeadCreate(BaseModel):
@@ -52,3 +54,31 @@ class LeadOut(BaseModel):
 class LeadListResponse(BaseModel):
     items: list[LeadOut]
     next_cursor: str | None = Field(default=None, description="Курсор для следующей страницы")
+
+
+class ManagerSummary(BaseModel):
+    id: uuid.UUID
+    full_name: str
+    email: str
+
+    model_config = {"from_attributes": True}
+
+
+class AcquisitionInfo(BaseModel):
+    source_channel: SourceChannel
+    click_id: str | None
+    campaign_id: str | None
+    adset_id: str | None
+    creative_id: str | None
+    landing_id: str | None
+    first_seen_at: datetime | None
+
+
+class LeadCardOut(BaseModel):
+    """Карточка лида: все 5 блоков (DoD Sprint 2)."""
+
+    profile: LeadOut
+    acquisition: AcquisitionInfo | None
+    manager: ManagerSummary | None
+    communications: list[CommunicationOut]
+    affiliate: list[AffiliateEventOut]

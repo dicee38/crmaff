@@ -1,5 +1,6 @@
 import uuid
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.enums import TrackingEventType
@@ -34,3 +35,13 @@ async def create_tracking_event(
     db.add(event)
     await db.flush()
     return event
+
+
+async def get_first_click_event(db: AsyncSession, lead_id: uuid.UUID) -> TrackingEvent | None:
+    result = await db.execute(
+        select(TrackingEvent)
+        .where(TrackingEvent.lead_id == lead_id, TrackingEvent.event_type == TrackingEventType.click)
+        .order_by(TrackingEvent.event_timestamp.asc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
