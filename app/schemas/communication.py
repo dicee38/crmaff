@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.models.enums import CommunicationChannel, CommunicationDirection
 
@@ -22,3 +22,7 @@ class CommunicationOut(BaseModel):
 class CommunicationListResponse(BaseModel):
     items: list[CommunicationOut]
     next_cursor: str | None = None
+
+
+class CommunicationSendRequest(BaseModel):
+    message_text: str = Field(min_length=1)

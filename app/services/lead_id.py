@@ -65,3 +65,41 @@ async def resolve_or_create_lead_for_click(
         ),
     )
     return LeadResolution(lead=lead, is_new=True)
+
+
+async def resolve_or_create_lead_for_message(
+    db: AsyncSession,
+    *,
+    telegram_user_id: str,
+    click_id: str | None = None,
+) -> LeadResolution:
+    """Резолвит lead_id для входящего сообщения Chatterfy.
+
+    Правило 5: сначала ищем по telegram_user_id (не пересоздаём лид для
+    уже знакомого пользователя). Правило 3: если лида ещё нет, но в
+    сообщении пришёл click_id (deep-link/start-параметр бота) -
+    сопоставляем с лидом, созданным по клику, и дозаполняем
+    telegram_user_id. Правило 4: если сопоставить не удалось - новый лид,
+    source_channel=organic.
+    """
+    existing = await get_lead_by_telegram_user_id(db, telegram_user_id)
+    if existing is not None:
+        return LeadResolution(lead=existing, is_new=False)
+
+    if click_id:
+        existing = await get_lead_by_external_click_id(db, click_id)
+        if existing is not None:
+            existing.telegram_user_id = telegram_user_id
+            await db.flush()
+            return LeadResolution(lead=existing, is_new=False)
+
+    lead = await create_lead(
+        db,
+        LeadCreate(
+            external_click_id=click_id,
+            source_channel=SourceChannel.organic,
+            telegram_user_id=telegram_user_id,
+            consent_status=ConsentStatus.unknown,
+        ),
+    )
+    return LeadResolution(lead=lead, is_new=True)

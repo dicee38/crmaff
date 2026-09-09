@@ -8,15 +8,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user, require_roles
 from app.core.rbac import CAN_ASSIGN_MANAGER, CAN_EDIT_LEAD, CAN_VIEW_ALL_LEADS
 from app.crud.affiliate_event import list_affiliate_events_by_lead
-from app.crud.communication import list_communications_by_lead
+from app.crud.communication import create_communication, list_communications_by_lead
 from app.crud.lead import create_lead, get_lead, list_leads, update_lead
 from app.crud.tracking_event import get_first_click_event
 from app.crud.user import get_user
 from app.database import get_db
-from app.models.enums import UserRole
+from app.models.enums import CommunicationChannel, CommunicationDirection, UserRole
 from app.models.user import User
 from app.schemas.affiliate_event import AffiliateEventOut
-from app.schemas.communication import CommunicationListResponse, CommunicationOut
+from app.schemas.communication import CommunicationListResponse, CommunicationOut, CommunicationSendRequest
 from app.schemas.lead import (
     AcquisitionInfo,
     LeadAssign,
@@ -28,6 +28,7 @@ from app.schemas.lead import (
     ManagerSummary,
 )
 from app.services.audit import write_audit_log
+from app.services.chatterfy_client import ChatterfyClient, ChatterfySendError, get_chatterfy_client
 
 router = APIRouter(prefix="/leads", tags=["leads"])
 
@@ -206,6 +207,51 @@ async def list_lead_communications_endpoint(
 
     communications = await list_communications_by_lead(db, lead_id)
     return CommunicationListResponse(items=[CommunicationOut.model_validate(c) for c in communications])
+
+
+@router.post("/{lead_id}/communications", response_model=CommunicationOut, status_code=status.HTTP_201_CREATED)
+async def send_lead_communication_endpoint(
+    lead_id: uuid.UUID,
+    payload: CommunicationSendRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    chatterfy_client: ChatterfyClient = Depends(get_chatterfy_client),
+) -> CommunicationOut:
+    """Отправка исходящего сообщения лиду через Chatterfy (webhook out)."""
+    lead = await _get_lead_or_404(db, lead_id)
+    _assert_can_edit(current_user, lead)
+
+    if not lead.telegram_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Lead has no linked telegram_user_id yet - cannot send a message",
+        )
+
+    communication = await create_communication(
+        db,
+        lead_id=lead.lead_id,
+        manager_id=current_user.id,
+        channel=CommunicationChannel.telegram,
+        direction=CommunicationDirection.outbound,
+        message_text=payload.message_text,
+    )
+
+    delivery_error: str | None = None
+    try:
+        await chatterfy_client.send_message(telegram_user_id=lead.telegram_user_id, text=payload.message_text)
+    except ChatterfySendError as exc:
+        delivery_error = str(exc)
+
+    await write_audit_log(
+        db,
+        actor_id=current_user.id,
+        action="communication_sent",
+        entity_type="lead",
+        entity_id=str(lead.lead_id),
+        meta={"communication_id": str(communication.id), "delivery_error": delivery_error},
+    )
+    await db.commit()
+    return CommunicationOut.model_validate(communication)
 
 
 @router.post("/{lead_id}/assign", response_model=LeadOut)

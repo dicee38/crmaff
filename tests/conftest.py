@@ -3,6 +3,7 @@ import os
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 os.environ["JWT_SECRET_KEY"] = "test-secret"
 os.environ["TRACK_CLICK_SIGNING_SECRET"] = "test-track-secret"
+os.environ["CHATTERFY_WEBHOOK_SECRET"] = "test-chatterfy-secret"
 
 import uuid
 from collections.abc import AsyncGenerator

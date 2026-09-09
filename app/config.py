@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     chatterfy_webhook_secret: str = "change-me"
     track_click_signing_secret: str = "change-me"
 
+    chatterfy_api_base_url: str = ""
+    chatterfy_api_key: str = ""
+
     sentry_dsn: str = ""
 
     cors_origins: str = "http://localhost:5173"
