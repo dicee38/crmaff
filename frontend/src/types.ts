@@ -3,6 +3,7 @@ export type UserRole =
   | "tech_lead"
   | "compliance"
   | "affiliate_manager"
+  | "mop_lead"
   | "sales_manager"
   | "smm_manager"
   | "analyst";
@@ -81,13 +82,27 @@ export interface Communication {
   created_at: string;
 }
 
+export type AffiliateEventType =
+  | "registration"
+  | "email_confirmed"
+  | "kyc_approved"
+  | "ftd"
+  | "deposit"
+  | "withdrawal"
+  | "commission"
+  | "chargeback";
+
 export interface AffiliateEvent {
   id: string;
   lead_id: string | null;
   partner: string;
-  event_type: "registration" | "kyc_approved" | "ftd" | "deposit" | "withdrawal" | "commission" | "chargeback";
+  source: "postback" | "manual";
+  entered_by: string | null;
+  channel: string | null;
+  event_type: AffiliateEventType;
   amount: number | null;
   currency: string | null;
+  validation_flags: Record<string, boolean> | null;
   received_at: string;
   processed_at: string | null;
 }
@@ -98,4 +113,102 @@ export interface LeadCard {
   manager: ManagerSummary | null;
   communications: Communication[];
   affiliate: AffiliateEvent[];
+}
+
+// --- Sprint 5 ---
+
+export interface FunnelData {
+  clicks: number;
+  leads_created: number;
+  manager_assigned: number;
+  registered: number;
+  ftd: number;
+  commission_total: number;
+}
+
+export interface KpiData {
+  total_leads: number;
+  total_registered: number;
+  total_ftd: number;
+  total_revenue: number;
+  lead2reg_pct: number;
+  reg2fd_pct: number;
+}
+
+export interface CashflowRow {
+  key: string | null;
+  label: string | null;
+  reg: number;
+  fd_count: number;
+  fd_sum: number;
+  rd_count: number;
+  rd_sum: number;
+  cashflow: number;
+  lead2reg_pct: number | null;
+  reg2fd_pct: number;
+}
+
+export interface CashflowReport {
+  total: CashflowRow;
+  groups: CashflowRow[];
+}
+
+export type LeaderboardMetric = "cashflow" | "fd_revenue_per_lead" | "lead_to_fd" | "fd_to_rd";
+export type LeaderboardPeriod = "week" | "month";
+
+export interface LeaderboardEntry {
+  rank: number;
+  manager_id: string;
+  label: string;
+  value: number;
+  is_current_user: boolean;
+}
+
+export interface LeaderboardData {
+  metric: LeaderboardMetric;
+  period: LeaderboardPeriod;
+  total_participants: number;
+  rows: LeaderboardEntry[];
+  current_user_rank: number | null;
+  delta_to_rank_above: number | null;
+  delta_over_rank_below: number | null;
+}
+
+export interface ActionListResponse {
+  items: AffiliateEvent[];
+  next_cursor: string | null;
+  aggregates: {
+    total_actions: number;
+    lead_count: number;
+    deposit_count: number;
+    deposit_sum: number;
+  };
+}
+
+export interface ManualActionCreate {
+  player_id: string;
+  partner_name: string;
+  channel?: string;
+  event_type: "registration" | "ftd" | "deposit" | "withdrawal" | "chargeback";
+  amount?: string;
+  currency?: string;
+  occurred_at?: string;
+}
+
+export type TaskStatus = "open" | "done" | "cancelled";
+
+export interface Task {
+  id: string;
+  lead_id: string;
+  manager_id: string | null;
+  title: string;
+  due_at: string | null;
+  status: TaskStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TaskListResponse {
+  items: Task[];
+  next_cursor: string | null;
 }
