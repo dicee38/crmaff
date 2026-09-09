@@ -14,6 +14,14 @@ if settings.database_url.startswith("sqlite"):
     engine_kwargs["connect_args"] = {"check_same_thread": False}
     if ":memory:" in settings.database_url:
         engine_kwargs["poolclass"] = StaticPool
+else:
+    # Дефолтный QueuePool (5 + 10 overflow = 15) слишком мал под конкурентную
+    # нагрузку и даёт P95 > 300ms на карточке лида уже при concurrency=20
+    # (см. scripts/run_load_test.py) - запросы простаивают в очереди на
+    # соединение, а не выполняются медленно. NFR: P95 < 300ms.
+    engine_kwargs["pool_size"] = 40
+    engine_kwargs["max_overflow"] = 40
+    engine_kwargs["pool_pre_ping"] = True
 
 engine = create_async_engine(settings.database_url, **engine_kwargs)
 
