@@ -74,6 +74,7 @@ class CommunicationDirection(str, enum.Enum):
 
 class AffiliateEventType(str, enum.Enum):
     registration = "registration"
+    email_confirmed = "email_confirmed"
     kyc_approved = "kyc_approved"
     ftd = "ftd"
     deposit = "deposit"

@@ -1,17 +1,22 @@
+from decimal import Decimal, InvalidOperation
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
-from app.core.signing import verify_hmac_signature
+from app.core.signing import verify_hmac_signature, verify_shared_secret
+from app.crud.affiliate_event import create_affiliate_event, get_affiliate_event_by_external_id
 from app.crud.communication import create_communication, get_communication_by_external_message_id
-from app.crud.lead import update_lead
+from app.crud.lead import get_lead_by_external_click_id, update_lead
 from app.database import get_db
 from app.logging_config import get_logger
-from app.models.enums import CommunicationChannel, CommunicationDirection, LeadStatus
+from app.models.enums import AffiliateEventType, CommunicationChannel, CommunicationDirection, LeadStatus
+from app.schemas.binolla import STATUS_TO_EVENT_TYPE, BinollaWebhookResponse
 from app.schemas.chatterfy import ChatterfyInboundMessage, ChatterfyWebhookResponse
 from app.schemas.lead import LeadUpdate
 from app.services.audit import write_audit_log
 from app.services.lead_id import resolve_or_create_lead_for_message
+from app.services.lead_status import BINOLLA_EVENT_TO_LEAD_STATUS, is_forward_transition
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 logger = get_logger(__name__)
@@ -76,3 +81,106 @@ async def chatterfy_webhook(
 
     # 9. Корректный HTTP-код (2xx).
     return ChatterfyWebhookResponse(lead_id=lead.lead_id, communication_id=communication.id)
+
+
+@router.get("/binolla", response_model=BinollaWebhookResponse)
+async def binolla_webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> BinollaWebhookResponse:
+    params = request.query_params
+
+    # 1. Проверить секрет (GET без тела - HMAC-подпись неприменима, секрет в query).
+    if not verify_shared_secret(settings.binolla_webhook_secret, params.get("secret")):
+        logger.warning("binolla_webhook.invalid_secret")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid secret")
+
+    # 2. Провалидировать структуру payload.
+    event_status = params.get("status")
+    external_event_id = params.get("eid")
+    click_id = params.get("cid")
+    if not event_status or not external_event_id or not click_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing required fields")
+
+    event_type_value = STATUS_TO_EVENT_TYPE.get(event_status)
+    if event_type_value is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unknown status: {event_status}")
+    event_type = AffiliateEventType(event_type_value)
+
+    # 5. raw_payload сохраняется как есть, до любой трансформации.
+    raw_payload = dict(params)
+
+    # 3. Идемпотентность по eid - при повторе вернуть 200 без повторной обработки.
+    existing = await get_affiliate_event_by_external_id(db, external_event_id)
+    if existing is not None:
+        return BinollaWebhookResponse(
+            lead_id=existing.lead_id,
+            affiliate_event_id=existing.id,
+            unmatched=existing.lead_id is None,
+        )
+
+    # 4. Определить lead_id по click_id (cid).
+    lead = await get_lead_by_external_click_id(db, click_id)
+
+    # 6. Нормализация: payout -> Decimal (пусто/нет для нефинансовых событий).
+    amount: Decimal | None = None
+    payout_raw = params.get("payout")
+    if payout_raw:
+        try:
+            amount = Decimal(payout_raw)
+        except InvalidOperation:
+            amount = None
+
+    validation_flags: dict | None = None
+    if lead is None:
+        # Неизвестный lead_id - НЕ отбрасываем событие, помечаем на эскалацию Affiliate Manager.
+        validation_flags = {"unmatched_lead": True}
+
+    affiliate_event = await create_affiliate_event(
+        db,
+        lead_id=lead.lead_id if lead else None,
+        partner="binolla",
+        external_event_id=external_event_id,
+        event_type=event_type,
+        amount=amount,
+        currency="USD" if amount is not None else None,
+        raw_payload=raw_payload,
+        normalized_payload={
+            "event_type": event_type.value,
+            "click_id": click_id,
+            "trader_id": params.get("uid"),
+            "site_id": params.get("sid"),
+            "link_id": params.get("lid"),
+            "amount": str(amount) if amount is not None else None,
+        },
+        validation_flags=validation_flags,
+    )
+
+    # 7. Обновить статус лида, если применимо (только вперёд по воронке).
+    if lead is not None:
+        target_status = BINOLLA_EVENT_TO_LEAD_STATUS.get(event_type.value)
+        if target_status is not None and is_forward_transition(lead.status, target_status):
+            await update_lead(db, lead, LeadUpdate(status=target_status))
+
+    # 8. audit_log.
+    await write_audit_log(
+        db,
+        actor_id=None,
+        action="affiliate_event_unmatched" if lead is None else "affiliate_event_received",
+        entity_type="lead",
+        entity_id=str(lead.lead_id) if lead else click_id,
+        meta={
+            "external_event_id": external_event_id,
+            "affiliate_event_id": str(affiliate_event.id),
+            "event_type": event_type.value,
+        },
+    )
+
+    await db.commit()
+
+    # 9. Корректный HTTP-код (2xx, событие принято и сохранено даже если lead не сматчен).
+    return BinollaWebhookResponse(
+        lead_id=lead.lead_id if lead else None,
+        affiliate_event_id=affiliate_event.id,
+        unmatched=lead is None,
+    )

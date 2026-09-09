@@ -11,3 +11,11 @@ def verify_hmac_signature(secret: str, payload: bytes, signature: str | None) ->
         return False
     expected = compute_hmac_signature(secret, payload)
     return hmac.compare_digest(expected, signature)
+
+
+def verify_shared_secret(secret: str, provided: str | None) -> bool:
+    """Сравнение простого shared-секрета (напр. query-параметр у GET-постбэков,
+    где нет тела запроса для HMAC-подписи). Константное время сравнения."""
+    if not provided:
+        return False
+    return hmac.compare_digest(secret, provided)

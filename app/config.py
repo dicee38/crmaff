@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     chatterfy_api_base_url: str = ""
     chatterfy_api_key: str = ""
 
+    rate_limit_public_per_minute: int = 60
+
     sentry_dsn: str = ""
 
     cors_origins: str = "http://localhost:5173"

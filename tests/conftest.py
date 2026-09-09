@@ -4,6 +4,8 @@ os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 os.environ["JWT_SECRET_KEY"] = "test-secret"
 os.environ["TRACK_CLICK_SIGNING_SECRET"] = "test-track-secret"
 os.environ["CHATTERFY_WEBHOOK_SECRET"] = "test-chatterfy-secret"
+os.environ["BINOLLA_WEBHOOK_SECRET"] = "test-binolla-secret"
+os.environ["REDIS_URL"] = "redis://localhost:65530/0"  # заведомо недоступен - проверяем fail-open rate limiter
 
 import uuid
 from collections.abc import AsyncGenerator

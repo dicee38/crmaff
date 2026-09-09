@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
+from app.core.rate_limit import RateLimiter
 from app.core.signing import verify_hmac_signature
 from app.crud.tracking_event import create_tracking_event
 from app.database import get_db
@@ -18,7 +19,7 @@ logger = get_logger(__name__)
 settings = get_settings()
 
 
-@router.post("/click", response_model=TrackClickResponse)
+@router.post("/click", response_model=TrackClickResponse, dependencies=[Depends(RateLimiter())])
 async def track_click(
     payload: TrackClickRequest,
     request: Request,

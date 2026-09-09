@@ -25,6 +25,12 @@ class Offer(Base):
         default=OfferStatus.active,
     )
     api_docs_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    # Шаблон ссылки для 302-редиректа с click-эндпоинта на оффер партнёра.
+    # Содержит плейсхолдер {click_id}, напр.:
+    # "https://binolla.com/?lid=28941&click_id={click_id}&site_id=1"
+    # Точный формат (какие параметры кроме click_id нужны) задаётся партнёром
+    # в его личном кабинете ("Link format") - см. CLAUDE.md, сверять перед прод-использованием.
+    redirect_url_template: Mapped[str | None] = mapped_column(String(1024), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
