@@ -15,11 +15,11 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.crud.lead import get_lead_by_external_click_id, get_lead_by_telegram_user_id
+from app.crud.lead import create_lead, get_lead_by_external_click_id, get_lead_by_telegram_user_id
 from app.models.enums import ConsentStatus, Dialect, SourceChannel
 from app.models.lead import Lead
 from app.schemas.lead import LeadCreate
-from app.crud.lead import create_lead
+from app.services.auto_assignment import try_auto_assign
 
 
 @dataclass
@@ -64,6 +64,7 @@ async def resolve_or_create_lead_for_click(
             consent_status=ConsentStatus.unknown,
         ),
     )
+    await try_auto_assign(db, lead)
     return LeadResolution(lead=lead, is_new=True)
 
 
@@ -102,4 +103,5 @@ async def resolve_or_create_lead_for_message(
             consent_status=ConsentStatus.unknown,
         ),
     )
+    await try_auto_assign(db, lead)
     return LeadResolution(lead=lead, is_new=True)

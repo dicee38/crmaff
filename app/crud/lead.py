@@ -31,6 +31,7 @@ async def list_leads(
     manager_id: uuid.UUID | None = None,
     geo: str | None = None,
     status: str | None = None,
+    unassigned_only: bool = False,
 ) -> list[Lead]:
     query = select(Lead).order_by(Lead.created_at.desc(), Lead.lead_id.desc())
 
@@ -42,6 +43,8 @@ async def list_leads(
         query = query.where(Lead.geo == geo)
     if status is not None:
         query = query.where(Lead.status == status)
+    if unassigned_only:
+        query = query.where(Lead.assigned_manager_id.is_(None))
 
     query = query.limit(limit)
     result = await db.execute(query)

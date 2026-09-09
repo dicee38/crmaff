@@ -28,6 +28,7 @@ from app.schemas.lead import (
     ManagerSummary,
 )
 from app.services.audit import write_audit_log
+from app.services.auto_assignment import try_auto_assign
 from app.services.chatterfy_client import ChatterfyClient, ChatterfySendError, get_chatterfy_client
 
 router = APIRouter(prefix="/leads", tags=["leads"])
@@ -50,6 +51,7 @@ async def list_leads_endpoint(
     limit: int = Query(default=50, ge=1, le=200),
     geo: str | None = Query(default=None),
     status_filter: str | None = Query(default=None, alias="status"),
+    unassigned: bool = Query(default=False, description="Только неназначенные лиды (очередь unassigned)"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> LeadListResponse:
@@ -62,6 +64,9 @@ async def list_leads_endpoint(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
         manager_filter = current_user.id
 
+    if unassigned and current_user.role not in CAN_ASSIGN_MANAGER:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+
     leads = await list_leads(
         db,
         cursor=decoded_cursor,
@@ -69,6 +74,7 @@ async def list_leads_endpoint(
         manager_id=manager_filter,
         geo=geo,
         status=status_filter,
+        unassigned_only=unassigned,
     )
 
     next_cursor = None
@@ -94,6 +100,18 @@ async def create_lead_endpoint(
         entity_id=str(lead.lead_id),
         meta=payload.model_dump(mode="json", exclude_unset=True),
     )
+
+    assigned_manager = await try_auto_assign(db, lead)
+    if assigned_manager is not None:
+        await write_audit_log(
+            db,
+            actor_id=None,
+            action="manager_auto_assigned",
+            entity_type="lead",
+            entity_id=str(lead.lead_id),
+            meta={"manager_id": str(assigned_manager.id)},
+        )
+
     await db.commit()
     return LeadOut.model_validate(lead)
 
@@ -153,6 +171,22 @@ async def update_lead_endpoint(
         entity_id=str(lead.lead_id),
         meta={"before": before, "changes": payload.model_dump(mode="json", exclude_unset=True)},
     )
+
+    # Если поменялись geo/dialect, а лид всё ещё не назначен - пробуем auto-assign повторно.
+    if ("geo" in payload.model_fields_set or "dialect" in payload.model_fields_set) and (
+        lead.assigned_manager_id is None
+    ):
+        assigned_manager = await try_auto_assign(db, lead)
+        if assigned_manager is not None:
+            await write_audit_log(
+                db,
+                actor_id=None,
+                action="manager_auto_assigned",
+                entity_type="lead",
+                entity_id=str(lead.lead_id),
+                meta={"manager_id": str(assigned_manager.id)},
+            )
+
     await db.commit()
     return LeadOut.model_validate(lead)
 
