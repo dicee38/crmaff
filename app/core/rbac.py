@@ -36,6 +36,22 @@ CAN_EDIT_LEAD = {
     UserRole.sales_manager,
 }
 
+# Кто может вносить ручные действия (/actions) и видеть их полностью
+# (sales_manager видит там только свои - фильтруется отдельно по assigned_manager_id).
+CAN_ENTER_MANUAL_ACTION = {
+    UserRole.admin,
+    UserRole.affiliate_manager,
+    UserRole.mop_lead,
+    UserRole.sales_manager,
+}
+
+CAN_VIEW_ALL_ACTIONS = {
+    UserRole.admin,
+    UserRole.affiliate_manager,
+    UserRole.mop_lead,
+    UserRole.analyst,
+}
+
 # Кто может управлять пользователями
 CAN_MANAGE_USERS = {
     UserRole.admin,

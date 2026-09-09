@@ -23,6 +23,11 @@ async def get_lead_by_external_click_id(db: AsyncSession, external_click_id: str
     return result.scalar_one_or_none()
 
 
+async def list_lead_ids_by_manager(db: AsyncSession, manager_id: uuid.UUID) -> list[uuid.UUID]:
+    result = await db.execute(select(Lead.lead_id).where(Lead.assigned_manager_id == manager_id))
+    return list(result.scalars().all())
+
+
 async def list_leads(
     db: AsyncSession,
     *,
