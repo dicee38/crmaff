@@ -46,5 +46,28 @@ services:
     volumes:
       - .:/app
 
+  # Ежедневный бэкап Postgres (NFR из CLAUDE.md). Не стартует с обычным
+  # `docker compose up` - только явно через `--profile backup`.
+  # На проде (Railway) эту же роль выполняет Railway Cron Job, дергающий
+  # scripts/backup_db.sh - см. README.md.
+  backup:
+    image: postgres:15
+    profiles: ["backup"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: ${POSTGRES_USER:-crm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crm}
+      POSTGRES_DB: ${POSTGRES_DB:-crm}
+      BACKUP_DIR: /backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./scripts:/scripts:ro
+      - ./backups:/backups
+    entrypoint: sh
+    command: -c "while true; do sh /scripts/backup_db.sh; sleep 86400; done"
+
 volumes:
   postgres_data:
