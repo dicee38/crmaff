@@ -174,8 +174,24 @@ export interface LeaderboardData {
   delta_over_rank_below: number | null;
 }
 
+export interface ActionRow {
+  id: string;
+  received_at: string;
+  partner: string;
+  channel: string | null;
+  event_type: AffiliateEventType;
+  source: "postback" | "manual";
+  player_external_id: string | null;
+  amount: number | null;
+  currency: string | null;
+  lead_id: string | null;
+  manager_full_name: string | null;
+  manager_role: string | null;
+  validation_flags: Record<string, boolean> | null;
+}
+
 export interface ActionListResponse {
-  items: AffiliateEvent[];
+  items: ActionRow[];
   next_cursor: string | null;
   aggregates: {
     total_actions: number;

@@ -165,6 +165,63 @@ async def test_compliance_cannot_view_actions(client, db_session):
     assert resp.status_code == 403
 
 
+async def test_actions_list_row_has_player_id_and_manager(client, db_session):
+    import uuid
+
+    from app.crud.lead import get_lead
+
+    admin = await make_user(db_session, UserRole.admin)
+    sm = await make_user(db_session, UserRole.sales_manager, full_name="Иван Демидов")
+
+    lead_resp = await client.post("/api/v1/leads", json={"geo": "SY"}, headers=auth_headers(admin))
+    lead_id = lead_resp.json()["lead_id"]
+    await client.post(
+        f"/api/v1/leads/{lead_id}/assign", json={"manager_id": str(sm.id)}, headers=auth_headers(admin)
+    )
+
+    lead = await get_lead(db_session, uuid.UUID(lead_id))
+    lead.external_click_id = "row-check-click"
+    await db_session.commit()
+
+    await client.post(
+        "/api/v1/actions",
+        json={
+            "player_id": "row-check-click",
+            "partner_name": "PocketOption",
+            "channel": "MENA-Kamil",
+            "event_type": "ftd",
+            "amount": "52.17",
+        },
+        headers=auth_headers(admin),
+    )
+
+    resp = await client.get("/api/v1/actions", headers=auth_headers(admin))
+    assert resp.status_code == 200
+    row = resp.json()["items"][0]
+    assert row["player_external_id"] == "row-check-click"
+    assert row["manager_full_name"] == "Иван Демидов"
+    assert row["manager_role"] == "sales_manager"
+    assert row["partner"] == "PocketOption"
+    assert row["channel"] == "MENA-Kamil"
+    assert float(row["amount"]) == 52.17
+    assert row["lead_id"] == lead_id
+
+
+async def test_actions_list_row_unmatched_lead_has_no_manager(client, db_session):
+    admin = await make_user(db_session, UserRole.admin)
+    await client.post(
+        "/api/v1/actions",
+        json={"player_id": "no-lead-for-this-one", "partner_name": "Binolla", "event_type": "registration"},
+        headers=auth_headers(admin),
+    )
+
+    resp = await client.get("/api/v1/actions", headers=auth_headers(admin))
+    row = resp.json()["items"][0]
+    assert row["lead_id"] is None
+    assert row["manager_full_name"] is None
+    assert row["player_external_id"] == "no-lead-for-this-one"
+
+
 async def test_actions_deposit_aggregates(client, db_session):
     admin = await make_user(db_session, UserRole.admin)
     await client.post(

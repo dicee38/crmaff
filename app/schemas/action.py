@@ -4,8 +4,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field, field_validator
 
-from app.models.enums import AffiliateEventSource
-from app.schemas.affiliate_event import AffiliateEventOut
+from app.models.enums import AffiliateEventSource, AffiliateEventType
 
 # Типы действий, доступные для ручного ввода (см. CLAUDE.md, "Ручной ввод действий МОП").
 MANUAL_ACTION_TYPES = {"registration", "ftd", "deposit", "withdrawal", "chargeback"}
@@ -36,7 +35,26 @@ class ActionAggregates(BaseModel):
     deposit_sum: Decimal
 
 
+class ActionRow(BaseModel):
+    """Строка журнала действий (/actions) - обогащена данными по лиду/менеджеру
+    для отображения в UI-таблице (см. CLAUDE.md, раздел "Список действий")."""
+
+    id: uuid.UUID
+    received_at: datetime
+    partner: str
+    channel: str | None
+    event_type: AffiliateEventType
+    source: AffiliateEventSource
+    player_external_id: str | None
+    amount: Decimal | None
+    currency: str | None
+    lead_id: uuid.UUID | None
+    manager_full_name: str | None
+    manager_role: str | None
+    validation_flags: dict | None
+
+
 class ActionListResponse(BaseModel):
-    items: list[AffiliateEventOut]
+    items: list[ActionRow]
     next_cursor: str | None = None
     aggregates: ActionAggregates

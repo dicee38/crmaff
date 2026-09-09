@@ -417,3 +417,17 @@ dd {
   font-size: 11px;
   margin-right: 4px;
 }
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.actions-table {
+  white-space: nowrap;
+}
+
+.mono-cell {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: var(--text-muted);
+}

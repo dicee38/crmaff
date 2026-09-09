@@ -28,6 +28,13 @@ async def list_lead_ids_by_manager(db: AsyncSession, manager_id: uuid.UUID) -> l
     return list(result.scalars().all())
 
 
+async def get_leads_by_ids(db: AsyncSession, lead_ids: list[uuid.UUID]) -> dict[uuid.UUID, Lead]:
+    if not lead_ids:
+        return {}
+    result = await db.execute(select(Lead).where(Lead.lead_id.in_(lead_ids)))
+    return {lead.lead_id: lead for lead in result.scalars().all()}
+
+
 async def list_leads(
     db: AsyncSession,
     *,

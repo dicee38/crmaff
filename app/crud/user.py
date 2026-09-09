@@ -18,6 +18,13 @@ async def get_user(db: AsyncSession, user_id: uuid.UUID) -> User | None:
     return result.scalar_one_or_none()
 
 
+async def get_users_by_ids(db: AsyncSession, user_ids: list[uuid.UUID]) -> dict[uuid.UUID, User]:
+    if not user_ids:
+        return {}
+    result = await db.execute(select(User).where(User.id.in_(user_ids)))
+    return {user.id: user for user in result.scalars().all()}
+
+
 async def create_user(
     db: AsyncSession,
     *,

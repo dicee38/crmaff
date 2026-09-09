@@ -14,11 +14,18 @@ from app.crud.affiliate_event import (
     find_possible_duplicate,
     list_affiliate_events,
 )
-from app.crud.lead import get_lead_by_external_click_id, get_lead_by_telegram_user_id, list_lead_ids_by_manager
+from app.crud.lead import (
+    get_lead_by_external_click_id,
+    get_lead_by_telegram_user_id,
+    get_leads_by_ids,
+    list_lead_ids_by_manager,
+)
+from app.crud.user import get_users_by_ids
 from app.database import get_db
+from app.models.affiliate_event import AffiliateEvent
 from app.models.enums import AffiliateEventSource, AffiliateEventType
 from app.models.user import User
-from app.schemas.action import AMOUNT_REQUIRED_TYPES, ActionListResponse, ManualActionCreate
+from app.schemas.action import AMOUNT_REQUIRED_TYPES, ActionListResponse, ActionRow, ManualActionCreate
 from app.schemas.affiliate_event import AffiliateEventOut
 from app.services.audit import write_audit_log
 
@@ -34,6 +41,46 @@ def _decode_cursor(cursor: str) -> datetime:
         return datetime.fromisoformat(base64.urlsafe_b64decode(cursor.encode()).decode())
     except (ValueError, UnicodeDecodeError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid cursor") from exc
+
+
+def _player_external_id(event: AffiliateEvent) -> str | None:
+    """ID игрока для отображения: uid от Binolla-постбэка или player_id,
+    введённый вручную - см. normalized_payload в webhooks.py / actions.py."""
+    payload = event.normalized_payload or {}
+    return payload.get("trader_id") or payload.get("player_id")
+
+
+async def _build_action_rows(db: AsyncSession, events: list[AffiliateEvent]) -> list[ActionRow]:
+    lead_ids = {e.lead_id for e in events if e.lead_id is not None}
+    leads_by_id = await get_leads_by_ids(db, list(lead_ids))
+
+    manager_ids = {
+        lead.assigned_manager_id for lead in leads_by_id.values() if lead.assigned_manager_id is not None
+    }
+    managers_by_id = await get_users_by_ids(db, list(manager_ids))
+
+    rows = []
+    for event in events:
+        lead = leads_by_id.get(event.lead_id) if event.lead_id else None
+        manager = managers_by_id.get(lead.assigned_manager_id) if lead and lead.assigned_manager_id else None
+        rows.append(
+            ActionRow(
+                id=event.id,
+                received_at=event.received_at,
+                partner=event.partner,
+                channel=event.channel,
+                event_type=event.event_type,
+                source=event.source,
+                player_external_id=_player_external_id(event),
+                amount=event.amount,
+                currency=event.currency,
+                lead_id=event.lead_id,
+                manager_full_name=manager.full_name if manager else None,
+                manager_role=manager.role.value if manager else None,
+                validation_flags=event.validation_flags,
+            )
+        )
+    return rows
 
 
 @router.post("", response_model=AffiliateEventOut, status_code=status.HTTP_201_CREATED)
@@ -154,7 +201,7 @@ async def list_actions_endpoint(
     aggregates = await aggregate_affiliate_events(db, **filters)
 
     return ActionListResponse(
-        items=[AffiliateEventOut.model_validate(e) for e in events],
+        items=await _build_action_rows(db, events),
         next_cursor=next_cursor,
         aggregates=aggregates,
     )

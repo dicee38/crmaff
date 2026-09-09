@@ -1,11 +1,34 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { Link } from "react-router-dom";
 
 import { api, ApiError } from "../api/client";
-import type { ActionListResponse, ManualActionCreate } from "../types";
+import type { ActionListResponse, ActionRow, ManualActionCreate } from "../types";
 
 const EVENT_TYPES = ["registration", "ftd", "deposit", "withdrawal", "chargeback"] as const;
 const AMOUNT_REQUIRED = new Set(["ftd", "deposit", "withdrawal"]);
+
+const EVENT_TYPE_LABELS: Record<ActionRow["event_type"], string> = {
+  registration: "Регистрация",
+  email_confirmed: "Подтверждение email",
+  kyc_approved: "KYC подтверждён",
+  ftd: "Первый депозит",
+  deposit: "Повторный депозит",
+  withdrawal: "Вывод средств",
+  commission: "Комиссия",
+  chargeback: "Чарджбэк",
+};
+
+const WARNING_LABELS: Record<string, string> = {
+  unmatched_lead: "лид не сматчен",
+  possible_duplicate: "возможный дубль",
+};
+
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}`;
+}
 
 export function ActionsPage() {
   const [data, setData] = useState<ActionListResponse | null>(null);
@@ -162,42 +185,62 @@ export function ActionsPage() {
             </div>
           </div>
 
-          <table className="actions-table">
-            <thead>
-              <tr>
-                <th>Тип</th>
-                <th>Источник</th>
-                <th>Сумма</th>
-                <th>Канал</th>
-                <th>Предупреждения</th>
-                <th>Дата</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.items.map((item) => (
-                <tr key={item.id}>
-                  <td>{item.event_type}</td>
-                  <td>{item.source}</td>
-                  <td>{item.amount != null ? `${item.amount} ${item.currency ?? ""}` : "—"}</td>
-                  <td>{item.channel ?? "—"}</td>
-                  <td>
-                    {item.validation_flags?.unmatched_lead && (
-                      <span className="warning-badge">лид не сматчен</span>
-                    )}
-                    {item.validation_flags?.possible_duplicate && (
-                      <span className="warning-badge">возможный дубль</span>
-                    )}
-                  </td>
-                  <td>{new Date(item.received_at).toLocaleString()}</td>
-                </tr>
-              ))}
-              {data.items.length === 0 && (
+          <div className="table-scroll">
+            <table className="actions-table">
+              <thead>
                 <tr>
-                  <td colSpan={6}>Действий не найдено</td>
+                  <th>ID</th>
+                  <th>Дата</th>
+                  <th>Партнёрская сеть</th>
+                  <th>Канал</th>
+                  <th>Тип действия</th>
+                  <th>ID игрока</th>
+                  <th>Сумма депозита</th>
+                  <th>Количество лидов</th>
+                  <th>МОП</th>
+                  <th>Предупреждения</th>
+                  <th>Ошибки</th>
+                  <th>Действия</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {data.items.map((item) => (
+                  <tr key={item.id}>
+                    <td className="mono-cell" title={item.id}>
+                      {item.id.slice(0, 8)}
+                    </td>
+                    <td>{formatDate(item.received_at)}</td>
+                    <td>{item.partner}</td>
+                    <td>{item.channel ?? "—"}</td>
+                    <td>{EVENT_TYPE_LABELS[item.event_type] ?? item.event_type}</td>
+                    <td>{item.player_external_id ?? "—"}</td>
+                    <td>{item.amount != null ? `${item.amount} ${item.currency ?? ""}` : "—"}</td>
+                    <td>—</td>
+                    <td>
+                      {item.manager_full_name ? `${item.manager_full_name} — ${item.manager_role}` : "—"}
+                    </td>
+                    <td>
+                      {item.validation_flags &&
+                        Object.entries(item.validation_flags)
+                          .filter(([, v]) => v)
+                          .map(([key]) => (
+                            <span className="warning-badge" key={key}>
+                              {WARNING_LABELS[key] ?? key}
+                            </span>
+                          ))}
+                    </td>
+                    <td>—</td>
+                    <td>{item.lead_id && <Link to={`/leads/${item.lead_id}`}>лид</Link>}</td>
+                  </tr>
+                ))}
+                {data.items.length === 0 && (
+                  <tr>
+                    <td colSpan={12}>Действий не найдено</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
     </div>
