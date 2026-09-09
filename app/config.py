@@ -32,6 +32,29 @@ class Settings(BaseSettings):
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
+    def assert_secrets_configured(self) -> None:
+        """Отказываем в старте вне development, если секреты остались
+        плейсхолдерами - иначе JWT/webhook-подписи подделываются тривиально.
+        Секреты - только через env/secret manager (NFR из CLAUDE.md)."""
+        if self.environment == "development":
+            return
+        placeholder_fields = {
+            "jwt_secret_key": self.jwt_secret_key,
+            "binolla_webhook_secret": self.binolla_webhook_secret,
+            "chatterfy_webhook_secret": self.chatterfy_webhook_secret,
+            "track_click_signing_secret": self.track_click_signing_secret,
+        }
+        insecure = [
+            name
+            for name, value in placeholder_fields.items()
+            if value.startswith("change-me") or len(value) < 16
+        ]
+        if insecure:
+            raise RuntimeError(
+                f"Небезопасные значения секретов для environment={self.environment!r}: {insecure}. "
+                "Задайте реальные случайные значения через env/secret manager перед запуском."
+            )
+
 
 @lru_cache
 def get_settings() -> Settings:

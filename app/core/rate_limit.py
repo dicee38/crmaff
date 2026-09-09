@@ -19,7 +19,15 @@ logger = get_logger(__name__)
 
 @lru_cache
 def _get_redis_client() -> redis.Redis:
-    return redis.from_url(get_settings().redis_url, decode_responses=True)
+    # Короткие таймауты обязательны: fail-open должен быть быстрым, иначе
+    # недоступный Redis не "мягко деградирует", а добавляет к каждому
+    # публичному запросу задержку в секунды (дефолтный TCP connect timeout).
+    return redis.from_url(
+        get_settings().redis_url,
+        decode_responses=True,
+        socket_connect_timeout=0.5,
+        socket_timeout=0.5,
+    )
 
 
 class RateLimiter:
@@ -36,7 +44,7 @@ class RateLimiter:
             current = await client.incr(key)
             if current == 1:
                 await client.expire(key, self.seconds)
-        except redis.RedisError as exc:
+        except (redis.RedisError, OSError) as exc:
             logger.warning("rate_limit.redis_unavailable", error=str(exc))
             return
 

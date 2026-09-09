@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
+from app.core.rate_limit import RateLimiter
 from app.core.signing import verify_hmac_signature, verify_shared_secret
 from app.crud.affiliate_event import create_affiliate_event, get_affiliate_event_by_external_id
 from app.crud.communication import create_communication, get_communication_by_external_message_id
@@ -23,7 +24,14 @@ logger = get_logger(__name__)
 settings = get_settings()
 
 
-@router.post("/chatterfy", response_model=ChatterfyWebhookResponse)
+@router.post(
+    "/chatterfy",
+    response_model=ChatterfyWebhookResponse,
+    # Выше лимит, чем у /track/click - это server-to-server трафик от
+    # партнёра (может приходить пачками с одного IP), а не с браузеров
+    # отдельных пользователей.
+    dependencies=[Depends(RateLimiter(times=300, seconds=60))],
+)
 async def chatterfy_webhook(
     payload: ChatterfyInboundMessage,
     request: Request,
@@ -83,7 +91,11 @@ async def chatterfy_webhook(
     return ChatterfyWebhookResponse(lead_id=lead.lead_id, communication_id=communication.id)
 
 
-@router.get("/binolla", response_model=BinollaWebhookResponse)
+@router.get(
+    "/binolla",
+    response_model=BinollaWebhookResponse,
+    dependencies=[Depends(RateLimiter(times=300, seconds=60))],
+)
 async def binolla_webhook(
     request: Request,
     db: AsyncSession = Depends(get_db),

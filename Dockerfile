@@ -11,4 +11,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# --no-access-log: дефолтный access-log uvicorn пишет query-строку без
+# редактирования (утечка секретов в query-параметрах вебхуков) - вместо
+# него RequestLoggingMiddleware (app/middleware/request_logging.py).
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
