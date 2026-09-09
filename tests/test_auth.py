@@ -52,6 +52,27 @@ async def test_admin_2fa_setup_and_login(client, db_session):
     assert login_resp.status_code == 200
 
 
+async def test_2fa_setup_and_enable_write_audit_log(client, db_session):
+    import pyotp
+    from sqlalchemy import select
+
+    from app.models.audit_log import AuditLog
+    from tests.conftest import auth_headers
+
+    user = await make_user(db_session, UserRole.admin, email="admin4@example.com", password="secret123")
+
+    setup_resp = await client.post("/api/v1/auth/2fa/setup", headers=auth_headers(user))
+    secret = setup_resp.json()["secret"]
+    await client.post(
+        "/api/v1/auth/2fa/verify", json={"code": pyotp.TOTP(secret).now()}, headers=auth_headers(user)
+    )
+
+    result = await db_session.execute(select(AuditLog).where(AuditLog.entity_id == str(user.id)))
+    actions = {log.action for log in result.scalars().all()}
+    assert "2fa_setup_started" in actions
+    assert "2fa_enabled" in actions
+
+
 async def test_admin_full_bootstrap_flow_via_real_login_only(client, db_session):
     """Полный путь ровно так, как это сделал бы реальный пользователь через
     отдельные HTTP-запросы (без обхода через auth_headers) - проверяет, что

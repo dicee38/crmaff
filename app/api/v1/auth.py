@@ -15,6 +15,7 @@ from app.schemas.auth import (
     TwoFactorVerifyRequest,
     UserOut,
 )
+from app.services.audit import write_audit_log
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -58,6 +59,14 @@ async def setup_2fa(
     secret = generate_totp_secret()
     current_user.totp_secret = secret
     current_user.is_2fa_enabled = False
+    await write_audit_log(
+        db,
+        actor_id=current_user.id,
+        action="2fa_setup_started",
+        entity_type="user",
+        entity_id=str(current_user.id),
+        meta=None,
+    )
     await db.commit()
     return TwoFactorSetupResponse(secret=secret, provisioning_uri=provisioning_uri(secret, current_user.email))
 
@@ -71,4 +80,12 @@ async def verify_2fa(
     if not current_user.totp_secret or not verify_totp_code(current_user.totp_secret, payload.code):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid 2FA code")
     current_user.is_2fa_enabled = True
+    await write_audit_log(
+        db,
+        actor_id=current_user.id,
+        action="2fa_enabled",
+        entity_type="user",
+        entity_id=str(current_user.id),
+        meta=None,
+    )
     await db.commit()
