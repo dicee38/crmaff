@@ -28,7 +28,7 @@ def _pct(numerator: int, denominator: int) -> float:
     return round(numerator / denominator * 100, 2)
 
 
-async def _reg_fd_rd_counts(
+async def reg_fd_rd_counts(
     db: AsyncSession,
     *,
     manager_id: uuid.UUID | None,
@@ -79,7 +79,7 @@ async def _reg_fd_rd_counts(
     }
 
 
-async def _total_leads_for_manager(
+async def total_leads_for_manager(
     db: AsyncSession, manager_id: uuid.UUID, *, date_from: datetime | None, date_to: datetime | None
 ) -> int:
     query = select(func.count()).select_from(Lead).where(Lead.assigned_manager_id == manager_id)
@@ -118,12 +118,12 @@ async def compute_mop_cashflow(
     свои данные, независимо от переданных group_by/manager_id)."""
     effective_manager_filter = scope_manager_id if scope_manager_id is not None else manager_id
 
-    total_counts = await _reg_fd_rd_counts(
+    total_counts = await reg_fd_rd_counts(
         db, manager_id=effective_manager_filter, channel=channel, date_from=date_from, date_to=date_to
     )
     total_leads = None
     if effective_manager_filter is not None:
-        total_leads = await _total_leads_for_manager(
+        total_leads = await total_leads_for_manager(
             db, effective_manager_filter, date_from=date_from, date_to=date_to
         )
     total_row = _row(total_counts, total_leads=total_leads)
@@ -141,10 +141,10 @@ async def compute_mop_cashflow(
         manager_ids = [m for m in managers_result.scalars().all() if manager_id is None or m == manager_id]
 
         for m_id in manager_ids:
-            counts = await _reg_fd_rd_counts(
+            counts = await reg_fd_rd_counts(
                 db, manager_id=m_id, channel=channel, date_from=date_from, date_to=date_to
             )
-            m_total_leads = await _total_leads_for_manager(db, m_id, date_from=date_from, date_to=date_to)
+            m_total_leads = await total_leads_for_manager(db, m_id, date_from=date_from, date_to=date_to)
             user_result = await db.execute(select(User).where(User.id == m_id))
             user = user_result.scalar_one_or_none()
             label = user.full_name if user else str(m_id)
@@ -157,7 +157,7 @@ async def compute_mop_cashflow(
         channels = [c for c in channels_result.scalars().all() if channel is None or c == channel]
 
         for ch in channels:
-            counts = await _reg_fd_rd_counts(
+            counts = await reg_fd_rd_counts(
                 db, manager_id=manager_id, channel=ch, date_from=date_from, date_to=date_to
             )
             # lead2reg_pct не считается для группировки по каналу - у лида
