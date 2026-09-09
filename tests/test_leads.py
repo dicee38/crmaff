@@ -108,3 +108,30 @@ async def test_list_leads_pagination_cursor(client, db_session):
 async def test_unauthenticated_request_rejected(client):
     resp = await client.get("/api/v1/leads")
     assert resp.status_code == 401
+
+
+async def test_mop_lead_can_view_all_leads(client, db_session):
+    admin = await make_user(db_session, UserRole.admin)
+    mop_lead = await make_user(db_session, UserRole.mop_lead)
+
+    await client.post("/api/v1/leads", json={"geo": "SY"}, headers=auth_headers(admin))
+
+    resp = await client.get("/api/v1/leads", headers=auth_headers(mop_lead))
+    assert resp.status_code == 200
+    assert len(resp.json()["items"]) == 1
+
+
+async def test_mop_lead_cannot_create_or_assign_lead(client, db_session):
+    admin = await make_user(db_session, UserRole.admin)
+    mop_lead = await make_user(db_session, UserRole.mop_lead)
+
+    create_resp = await client.post("/api/v1/leads", json={"geo": "SY"}, headers=auth_headers(mop_lead))
+    assert create_resp.status_code == 403
+
+    lead_resp = await client.post("/api/v1/leads", json={"geo": "SY"}, headers=auth_headers(admin))
+    lead_id = lead_resp.json()["lead_id"]
+
+    assign_resp = await client.post(
+        f"/api/v1/leads/{lead_id}/assign", json={"manager_id": str(mop_lead.id)}, headers=auth_headers(mop_lead)
+    )
+    assert assign_resp.status_code == 403

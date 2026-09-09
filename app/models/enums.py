@@ -6,6 +6,7 @@ class UserRole(str, enum.Enum):
     tech_lead = "tech_lead"
     compliance = "compliance"
     affiliate_manager = "affiliate_manager"
+    mop_lead = "mop_lead"
     sales_manager = "sales_manager"
     smm_manager = "smm_manager"
     analyst = "analyst"
@@ -79,6 +80,11 @@ class AffiliateEventType(str, enum.Enum):
     withdrawal = "withdrawal"
     commission = "commission"
     chargeback = "chargeback"
+
+
+class AffiliateEventSource(str, enum.Enum):
+    postback = "postback"
+    manual = "manual"
 
 
 class CampaignStatus(str, enum.Enum):

@@ -1,9 +1,15 @@
 from app.models.enums import UserRole
 
-# Кто может видеть ВСЕХ лидов (не только своих)
+# Кто может видеть ВСЕХ лидов (не только своих).
+# mop_lead по матрице видит только "свою команду" - в схеме пока нет понятия
+# команды/иерархии менеджеров (появится в Sprint 5 вместе с cashflow-отчётом
+# и лидербордом), поэтому временно приравниваем к полному доступу, как
+# affiliate_manager/compliance. Сузить до реальной команды - после того как
+# появится team_id/иерархия в модели users.
 CAN_VIEW_ALL_LEADS = {
     UserRole.admin,
     UserRole.affiliate_manager,
+    UserRole.mop_lead,
     UserRole.compliance,
     UserRole.analyst,
 }
@@ -12,6 +18,7 @@ CAN_VIEW_ALL_LEADS = {
 CAN_VIEW_REVENUE = {
     UserRole.admin,
     UserRole.affiliate_manager,
+    UserRole.mop_lead,
     UserRole.compliance,
     UserRole.analyst,
 }
