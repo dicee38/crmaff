@@ -1,12 +1,16 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Numeric, String, func
+from sqlalchemy import DateTime, Enum, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
 from app.models.enums import AffiliateEventSource, AffiliateEventType
 from app.models.types import GUID, JSONBType
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class AffiliateEvent(Base):
@@ -35,5 +39,6 @@ class AffiliateEvent(Base):
     raw_payload: Mapped[dict] = mapped_column(JSONBType(), nullable=False, default=dict)
     normalized_payload: Mapped[dict | None] = mapped_column(JSONBType(), nullable=True)
     validation_flags: Mapped[dict | None] = mapped_column(JSONBType(), nullable=True)
-    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Python-side default - нужна микросекундная точность для курсорной пагинации в /actions.
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

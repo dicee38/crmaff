@@ -1,12 +1,16 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Enum, ForeignKey, String, func
+from sqlalchemy import DateTime, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
 from app.models.enums import TaskStatus
 from app.models.types import GUID
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class Task(Base):
@@ -23,7 +27,7 @@ class Task(Base):
         default=TaskStatus.open,
     )
 
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    )
+    # Python-side default (не server_default) - нужна микросекундная точность
+    # для курсорной пагинации, как у Lead (см. app/models/lead.py).
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow)
