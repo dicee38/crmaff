@@ -20,11 +20,16 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
-def create_access_token(subject: uuid.UUID | str, role: str, expires_minutes: int | None = None) -> str:
+def create_access_token(
+    subject: uuid.UUID | str,
+    role: str,
+    expires_minutes: int | None = None,
+    scope: str = "full",
+) -> str:
     expire = datetime.now(timezone.utc) + timedelta(
         minutes=expires_minutes if expires_minutes is not None else settings.jwt_access_token_expire_minutes
     )
-    payload: dict[str, Any] = {"sub": str(subject), "role": role, "exp": expire}
+    payload: dict[str, Any] = {"sub": str(subject), "role": role, "scope": scope, "exp": expire}
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 

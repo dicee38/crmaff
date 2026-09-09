@@ -2,11 +2,19 @@ from app.models.enums import UserRole
 from tests.conftest import make_user
 
 
-async def test_login_success(client, db_session):
-    user = await make_user(db_session, UserRole.admin, email="admin@example.com", password="secret123")
-    # admin требует 2FA - без него логин должен быть запрещён.
+async def test_login_without_2fa_returns_setup_scoped_token(client, db_session):
+    await make_user(db_session, UserRole.admin, email="admin@example.com", password="secret123")
+    # admin без включённой 2FA получает ограниченный bootstrap-токен, а не 403 -
+    # иначе 2FA невозможно было бы включить в принципе (курица и яйцо).
     resp = await client.post("/api/v1/auth/login", json={"email": "admin@example.com", "password": "secret123"})
-    assert resp.status_code == 403
+    assert resp.status_code == 200
+    setup_token = resp.json()["access_token"]
+
+    # Этим токеном нельзя дёрнуть обычный защищённый эндпоинт.
+    forbidden_resp = await client.get(
+        "/api/v1/leads", headers={"Authorization": f"Bearer {setup_token}"}
+    )
+    assert forbidden_resp.status_code == 403
 
 
 async def test_login_non_admin_no_2fa_required(client, db_session):
@@ -42,3 +50,37 @@ async def test_admin_2fa_setup_and_login(client, db_session):
         json={"email": "admin2@example.com", "password": "secret123", "totp_code": login_code},
     )
     assert login_resp.status_code == 200
+
+
+async def test_admin_full_bootstrap_flow_via_real_login_only(client, db_session):
+    """Полный путь ровно так, как это сделал бы реальный пользователь через
+    отдельные HTTP-запросы (без обхода через auth_headers) - проверяет, что
+    изменения из /2fa/setup и /2fa/verify реально коммитятся в БД."""
+    import pyotp
+
+    await make_user(db_session, UserRole.admin, email="admin3@example.com", password="secret123")
+
+    bootstrap_resp = await client.post(
+        "/api/v1/auth/login", json={"email": "admin3@example.com", "password": "secret123"}
+    )
+    setup_token = bootstrap_resp.json()["access_token"]
+    setup_headers = {"Authorization": f"Bearer {setup_token}"}
+
+    setup_resp = await client.post("/api/v1/auth/2fa/setup", headers=setup_headers)
+    secret = setup_resp.json()["secret"]
+
+    verify_resp = await client.post(
+        "/api/v1/auth/2fa/verify", json={"code": pyotp.TOTP(secret).now()}, headers=setup_headers
+    )
+    assert verify_resp.status_code == 204
+
+    final_login = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "admin3@example.com", "password": "secret123", "totp_code": pyotp.TOTP(secret).now()},
+    )
+    assert final_login.status_code == 200
+    full_token = final_login.json()["access_token"]
+
+    me_resp = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {full_token}"})
+    assert me_resp.status_code == 200
+    assert me_resp.json()["email"] == "admin3@example.com"

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_current_user_for_2fa_setup
 from app.core.security import create_access_token, verify_password
 from app.core.totp import generate_totp_secret, provisioning_uri, verify_totp_code
 from app.crud.user import get_user_by_email
@@ -30,10 +30,14 @@ async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)) -> To
     # 2FA обязательна для роли admin (нефункциональное требование).
     if user.role == UserRole.admin:
         if not user.is_2fa_enabled or not user.totp_secret:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="2FA setup required for admin accounts before login",
+            # Bootstrap: выдаём ограниченный токен (scope=2fa_setup), которым
+            # можно вызвать ТОЛЬКО /auth/2fa/setup и /auth/2fa/verify - иначе
+            # admin физически не смог бы включить 2FA при первом входе
+            # (get_current_user такой токен никуда больше не пропустит).
+            setup_token = create_access_token(
+                subject=user.id, role=user.role.value, expires_minutes=15, scope="2fa_setup"
             )
+            return TokenResponse(access_token=setup_token)
         if not payload.totp_code or not verify_totp_code(user.totp_secret, payload.totp_code):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or missing 2FA code")
 
@@ -48,23 +52,23 @@ async def read_current_user(current_user: User = Depends(get_current_user)) -> U
 
 @router.post("/2fa/setup", response_model=TwoFactorSetupResponse)
 async def setup_2fa(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_for_2fa_setup),
     db: AsyncSession = Depends(get_db),
 ) -> TwoFactorSetupResponse:
     secret = generate_totp_secret()
     current_user.totp_secret = secret
     current_user.is_2fa_enabled = False
-    await db.flush()
+    await db.commit()
     return TwoFactorSetupResponse(secret=secret, provisioning_uri=provisioning_uri(secret, current_user.email))
 
 
 @router.post("/2fa/verify", status_code=status.HTTP_204_NO_CONTENT)
 async def verify_2fa(
     payload: TwoFactorVerifyRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_for_2fa_setup),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     if not current_user.totp_secret or not verify_totp_code(current_user.totp_secret, payload.code):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid 2FA code")
     current_user.is_2fa_enabled = True
-    await db.flush()
+    await db.commit()
