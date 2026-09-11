@@ -211,6 +211,20 @@ export interface ManualActionCreate {
   occurred_at?: string;
 }
 
+export interface Partner {
+  id: string;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface Channel {
+  id: string;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+}
+
 export type TaskStatus = "open" | "done" | "cancelled";
 
 export interface Task {

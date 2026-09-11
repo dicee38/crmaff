@@ -245,3 +245,41 @@ async def test_actions_deposit_aggregates(client, db_session):
     assert aggregates["total_actions"] == 3
     assert aggregates["deposit_count"] == 2
     assert float(aggregates["deposit_sum"]) == 150.0
+
+
+async def test_admin_can_delete_action(client, db_session):
+    admin = await make_user(db_session, UserRole.admin)
+    create_resp = await client.post(
+        "/api/v1/actions",
+        json={"player_id": "del-1", "partner_name": "Binolla", "event_type": "registration"},
+        headers=auth_headers(admin),
+    )
+    event_id = create_resp.json()["id"]
+
+    resp = await client.delete(f"/api/v1/actions/{event_id}", headers=auth_headers(admin))
+    assert resp.status_code == 204
+
+    list_resp = await client.get("/api/v1/actions", headers=auth_headers(admin))
+    assert all(item["id"] != event_id for item in list_resp.json()["items"])
+
+
+async def test_non_admin_cannot_delete_action(client, db_session):
+    admin = await make_user(db_session, UserRole.admin)
+    mop_lead = await make_user(db_session, UserRole.mop_lead)
+    create_resp = await client.post(
+        "/api/v1/actions",
+        json={"player_id": "del-2", "partner_name": "Binolla", "event_type": "registration"},
+        headers=auth_headers(admin),
+    )
+    event_id = create_resp.json()["id"]
+
+    resp = await client.delete(f"/api/v1/actions/{event_id}", headers=auth_headers(mop_lead))
+    assert resp.status_code == 403
+
+
+async def test_delete_nonexistent_action_404(client, db_session):
+    import uuid
+
+    admin = await make_user(db_session, UserRole.admin)
+    resp = await client.delete(f"/api/v1/actions/{uuid.uuid4()}", headers=auth_headers(admin))
+    assert resp.status_code == 404

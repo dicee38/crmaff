@@ -431,3 +431,43 @@ dd {
   font-size: 12px;
   color: var(--text-muted);
 }
+
+/* --- Профиль / Админ-панель --- */
+
+.app-user-link {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.app-user-link:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+.danger-link {
+  background: none;
+  border: none;
+  color: var(--danger);
+  padding: 0;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.danger-link:hover {
+  text-decoration: underline;
+}
+
+.form-success {
+  color: #1a8a4a;
+  font-size: 13px;
+}
+
+.status-badge.status-active {
+  background: #e6f6ec;
+  color: #1a8a4a;
+}
+
+.status-badge.status-churned {
+  background: #fdecea;
+  color: var(--danger);
+}

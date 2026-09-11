@@ -3,17 +3,22 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, require_roles
-from app.core.rbac import CAN_ASSIGN_MANAGER, CAN_EDIT_LEAD, CAN_VIEW_ALL_LEADS
+from app.core.rbac import CAN_ASSIGN_MANAGER, CAN_DELETE_RECORDS, CAN_EDIT_LEAD, CAN_VIEW_ALL_LEADS
 from app.crud.affiliate_event import list_affiliate_events_by_lead
 from app.crud.communication import create_communication, list_communications_by_lead
 from app.crud.lead import create_lead, get_lead, list_leads, update_lead
 from app.crud.tracking_event import get_first_click_event
 from app.crud.user import get_user
 from app.database import get_db
+from app.models.affiliate_event import AffiliateEvent
+from app.models.communication import Communication
 from app.models.enums import CommunicationChannel, CommunicationDirection, UserRole
+from app.models.task import Task
+from app.models.tracking_event import TrackingEvent
 from app.models.user import User
 from app.schemas.affiliate_event import AffiliateEventOut
 from app.schemas.communication import CommunicationListResponse, CommunicationOut, CommunicationSendRequest
@@ -312,3 +317,33 @@ async def assign_lead_endpoint(
     )
     await db.commit()
     return LeadOut.model_validate(lead)
+
+
+@router.delete("/{lead_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_lead_endpoint(
+    lead_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(*CAN_DELETE_RECORDS)),
+) -> None:
+    """Жёсткое удаление лида (только admin). Communications/tasks удаляются
+    вместе с лидом (без него бессмысленны); tracking_events/affiliate_events -
+    исторические события с реальными деньгами/статистикой - НЕ удаляются,
+    просто отвязываются (lead_id -> NULL), чтобы не терять аудиторский след."""
+    lead = await _get_lead_or_404(db, lead_id)
+
+    await db.execute(delete(Communication).where(Communication.lead_id == lead_id))
+    await db.execute(delete(Task).where(Task.lead_id == lead_id))
+    await db.execute(update(TrackingEvent).where(TrackingEvent.lead_id == lead_id).values(lead_id=None))
+    await db.execute(update(AffiliateEvent).where(AffiliateEvent.lead_id == lead_id).values(lead_id=None))
+
+    await write_audit_log(
+        db,
+        actor_id=current_user.id,
+        action="lead_deleted",
+        entity_type="lead",
+        entity_id=str(lead_id),
+        meta={"geo": lead.geo, "status": lead.status.value},
+    )
+
+    await db.delete(lead)
+    await db.commit()

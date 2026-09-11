@@ -28,6 +28,11 @@ async def get_affiliate_event_by_external_id(db: AsyncSession, external_event_id
     return result.scalar_one_or_none()
 
 
+async def get_affiliate_event(db: AsyncSession, event_id: uuid.UUID) -> AffiliateEvent | None:
+    result = await db.execute(select(AffiliateEvent).where(AffiliateEvent.id == event_id))
+    return result.scalar_one_or_none()
+
+
 async def create_affiliate_event(
     db: AsyncSession,
     *,

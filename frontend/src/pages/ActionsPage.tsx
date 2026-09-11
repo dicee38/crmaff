@@ -3,7 +3,8 @@ import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
 
 import { api, ApiError } from "../api/client";
-import type { ActionListResponse, ActionRow, ManualActionCreate } from "../types";
+import { useAuth } from "../auth/AuthContext";
+import type { ActionListResponse, ActionRow, Channel, ManualActionCreate, Partner } from "../types";
 
 const EVENT_TYPES = ["registration", "ftd", "deposit", "withdrawal", "chargeback"] as const;
 const AMOUNT_REQUIRED = new Set(["ftd", "deposit", "withdrawal"]);
@@ -31,14 +32,19 @@ function formatDate(iso: string): string {
 }
 
 export function ActionsPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+
   const [data, setData] = useState<ActionListResponse | null>(null);
+  const [partners, setPartners] = useState<Partner[]>([]);
+  const [channels, setChannels] = useState<Channel[]>([]);
   const [sourceFilter, setSourceFilter] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [form, setForm] = useState<ManualActionCreate>({
     player_id: "",
-    partner_name: "Binolla",
+    partner_name: "",
     channel: "",
     event_type: "registration",
     amount: "",
@@ -65,10 +71,30 @@ export function ActionsPage() {
     void fetchActions();
   }, [fetchActions]);
 
+  useEffect(() => {
+    api
+      .get<Partner[]>("/partners")
+      .then((list) => {
+        setPartners(list);
+        if (list.length > 0) {
+          setForm((f) => (f.partner_name ? f : { ...f, partner_name: list[0].name }));
+        }
+      })
+      .catch(() => undefined);
+    api
+      .get<Channel[]>("/channels")
+      .then(setChannels)
+      .catch(() => undefined);
+  }, []);
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setFormError(null);
 
+    if (!form.partner_name) {
+      setFormError("Выберите партнёрскую сеть");
+      return;
+    }
     if (AMOUNT_REQUIRED.has(form.event_type) && !form.amount) {
       setFormError(`Сумма обязательна для типа "${form.event_type}"`);
       return;
@@ -90,6 +116,16 @@ export function ActionsPage() {
     }
   }
 
+  async function handleDelete(id: string) {
+    if (!window.confirm("Удалить это действие безвозвратно?")) return;
+    try {
+      await api.delete(`/actions/${id}`);
+      await fetchActions();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Не удалось удалить действие");
+    }
+  }
+
   return (
     <div className="page">
       <h1>Действия (постбэки + ручной ввод)</h1>
@@ -106,20 +142,32 @@ export function ActionsPage() {
             />
           </label>
           <label>
-            Партнёр
-            <input
+            Партнёрская сеть
+            <select
               value={form.partner_name}
               onChange={(e) => setForm({ ...form, partner_name: e.target.value })}
               required
-            />
+            >
+              <option value="" disabled>
+                Выберите...
+              </option>
+              {partners.map((p) => (
+                <option key={p.id} value={p.name}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
           </label>
           <label>
             Канал
-            <input
-              value={form.channel}
-              onChange={(e) => setForm({ ...form, channel: e.target.value })}
-              placeholder="MENA-KARIM"
-            />
+            <select value={form.channel} onChange={(e) => setForm({ ...form, channel: e.target.value })}>
+              <option value="">Без канала</option>
+              {channels.map((c) => (
+                <option key={c.id} value={c.name}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
           </label>
           <label>
             Тип действия
@@ -129,7 +177,7 @@ export function ActionsPage() {
             >
               {EVENT_TYPES.map((t) => (
                 <option key={t} value={t}>
-                  {t}
+                  {EVENT_TYPE_LABELS[t] ?? t}
                 </option>
               ))}
             </select>
@@ -148,6 +196,16 @@ export function ActionsPage() {
             {submitting ? "Сохранение..." : "Сохранить"}
           </button>
         </form>
+        {partners.length === 0 && (
+          <p className="empty-block">
+            Нет ни одной партнёрской сети в справочнике.{" "}
+            {isAdmin ? (
+              <Link to="/admin">Добавьте её в админ-панели</Link>
+            ) : (
+              "Попросите администратора добавить её."
+            )}
+          </p>
+        )}
       </section>
 
       <div className="filters">
@@ -200,7 +258,8 @@ export function ActionsPage() {
                   <th>МОП</th>
                   <th>Предупреждения</th>
                   <th>Ошибки</th>
-                  <th>Действия</th>
+                  <th>Лид</th>
+                  {isAdmin && <th></th>}
                 </tr>
               </thead>
               <tbody>
@@ -231,11 +290,18 @@ export function ActionsPage() {
                     </td>
                     <td>—</td>
                     <td>{item.lead_id && <Link to={`/leads/${item.lead_id}`}>лид</Link>}</td>
+                    {isAdmin && (
+                      <td>
+                        <button onClick={() => handleDelete(item.id)} className="danger-link">
+                          Удалить
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
                 {data.items.length === 0 && (
                   <tr>
-                    <td colSpan={12}>Действий не найдено</td>
+                    <td colSpan={isAdmin ? 13 : 12}>Действий не найдено</td>
                   </tr>
                 )}
               </tbody>

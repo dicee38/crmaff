@@ -4,17 +4,20 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ActionsPage } from "./pages/ActionsPage";
+import { AdminPage } from "./pages/AdminPage";
 import { CashflowReportPage } from "./pages/CashflowReportPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { LeadCardPage } from "./pages/LeadCardPage";
 import { LeadsListPage } from "./pages/LeadsListPage";
 import { LeaderboardPage } from "./pages/LeaderboardPage";
 import { LoginPage } from "./pages/LoginPage";
+import { ProfilePage } from "./pages/ProfilePage";
 import { TasksPage } from "./pages/TasksPage";
+import type { UserRole } from "./types";
 
-function withLayout(children: ReactNode) {
+function withLayout(children: ReactNode, roles?: UserRole[]) {
   return (
-    <ProtectedRoute>
+    <ProtectedRoute roles={roles}>
       <Layout>{children}</Layout>
     </ProtectedRoute>
   );
@@ -31,6 +34,8 @@ export function App() {
       <Route path="/leaderboard" element={withLayout(<LeaderboardPage />)} />
       <Route path="/actions" element={withLayout(<ActionsPage />)} />
       <Route path="/tasks" element={withLayout(<TasksPage />)} />
+      <Route path="/profile" element={withLayout(<ProfilePage />)} />
+      <Route path="/admin" element={withLayout(<AdminPage />, ["admin"])} />
       <Route path="/" element={<Navigate to="/leads" replace />} />
       <Route path="*" element={<Navigate to="/leads" replace />} />
     </Routes>

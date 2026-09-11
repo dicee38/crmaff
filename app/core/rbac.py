@@ -62,6 +62,16 @@ CAN_MANAGE_INTEGRATIONS = {
     UserRole.admin,
 }
 
+# Кто может управлять справочниками (партнёры, каналы) - создавать/деактивировать
+CAN_MANAGE_REFERENCE_DATA = {
+    UserRole.admin,
+}
+
+# Кто может удалять лидов и действия (жёсткое удаление - только admin)
+CAN_DELETE_RECORDS = {
+    UserRole.admin,
+}
+
 # Кто может просматривать audit logs
 CAN_VIEW_AUDIT_LOGS = {
     UserRole.admin,

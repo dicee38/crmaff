@@ -7,8 +7,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, require_roles
-from app.core.rbac import CAN_ENTER_MANUAL_ACTION, CAN_VIEW_ALL_ACTIONS
+from app.core.rbac import CAN_DELETE_RECORDS, CAN_ENTER_MANUAL_ACTION, CAN_VIEW_ALL_ACTIONS
 from app.crud.affiliate_event import (
+    get_affiliate_event,
     aggregate_affiliate_events,
     create_affiliate_event,
     find_possible_duplicate,
@@ -205,3 +206,31 @@ async def list_actions_endpoint(
         next_cursor=next_cursor,
         aggregates=aggregates,
     )
+
+
+@router.delete("/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_action_endpoint(
+    event_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(*CAN_DELETE_RECORDS)),
+) -> None:
+    """Жёсткое удаление записи действия (postback или manual) - только admin."""
+    event = await get_affiliate_event(db, event_id)
+    if event is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Action not found")
+
+    await write_audit_log(
+        db,
+        actor_id=current_user.id,
+        action="affiliate_event_deleted",
+        entity_type="affiliate_event",
+        entity_id=str(event_id),
+        meta={
+            "external_event_id": event.external_event_id,
+            "event_type": event.event_type.value,
+            "lead_id": str(event.lead_id) if event.lead_id else None,
+        },
+    )
+
+    await db.delete(event)
+    await db.commit()

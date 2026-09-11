@@ -105,3 +105,39 @@ async def test_admin_full_bootstrap_flow_via_real_login_only(client, db_session)
     me_resp = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {full_token}"})
     assert me_resp.status_code == 200
     assert me_resp.json()["email"] == "admin3@example.com"
+
+
+async def test_change_password_success_and_relogin(client, db_session):
+    from tests.conftest import auth_headers
+
+    user = await make_user(db_session, UserRole.sales_manager, email="pwtest@example.com", password="oldpass123")
+
+    resp = await client.post(
+        "/api/v1/auth/change-password",
+        json={"current_password": "oldpass123", "new_password": "newpass456"},
+        headers=auth_headers(user),
+    )
+    assert resp.status_code == 204
+
+    old_login = await client.post(
+        "/api/v1/auth/login", json={"email": "pwtest@example.com", "password": "oldpass123"}
+    )
+    assert old_login.status_code == 401
+
+    new_login = await client.post(
+        "/api/v1/auth/login", json={"email": "pwtest@example.com", "password": "newpass456"}
+    )
+    assert new_login.status_code == 200
+
+
+async def test_change_password_wrong_current_rejected(client, db_session):
+    from tests.conftest import auth_headers
+
+    user = await make_user(db_session, UserRole.sales_manager, email="pwtest2@example.com", password="oldpass123")
+
+    resp = await client.post(
+        "/api/v1/auth/change-password",
+        json={"current_password": "wrong-password", "new_password": "newpass456"},
+        headers=auth_headers(user),
+    )
+    assert resp.status_code == 401

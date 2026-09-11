@@ -29,6 +29,7 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["admin", "affiliate_manager", "mop_lead", "sales_manager", "analyst"],
   },
   { to: "/leaderboard", label: "Лидерборд" },
+  { to: "/admin", label: "Админ-панель", roles: ["admin"] },
 ];
 
 export function Layout({ children }: { children: ReactNode }) {
@@ -58,9 +59,9 @@ export function Layout({ children }: { children: ReactNode }) {
         )}
         {user && (
           <div className="app-user">
-            <span>
+            <Link to="/profile" className="app-user-link">
               {user.full_name} · {user.role}
-            </span>
+            </Link>
             <button onClick={logout}>Выйти</button>
           </div>
         )}

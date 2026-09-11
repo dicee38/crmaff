@@ -135,3 +135,53 @@ async def test_mop_lead_cannot_create_or_assign_lead(client, db_session):
         f"/api/v1/leads/{lead_id}/assign", json={"manager_id": str(mop_lead.id)}, headers=auth_headers(mop_lead)
     )
     assert assign_resp.status_code == 403
+
+
+async def test_admin_can_delete_lead(client, db_session):
+    admin = await make_user(db_session, UserRole.admin)
+    create_resp = await client.post("/api/v1/leads", json={"geo": "SY"}, headers=auth_headers(admin))
+    lead_id = create_resp.json()["lead_id"]
+
+    resp = await client.delete(f"/api/v1/leads/{lead_id}", headers=auth_headers(admin))
+    assert resp.status_code == 204
+
+    get_resp = await client.get(f"/api/v1/leads/{lead_id}", headers=auth_headers(admin))
+    assert get_resp.status_code == 404
+
+
+async def test_non_admin_cannot_delete_lead(client, db_session):
+    admin = await make_user(db_session, UserRole.admin)
+    affman = await make_user(db_session, UserRole.affiliate_manager)
+    create_resp = await client.post("/api/v1/leads", json={"geo": "SY"}, headers=auth_headers(admin))
+    lead_id = create_resp.json()["lead_id"]
+
+    resp = await client.delete(f"/api/v1/leads/{lead_id}", headers=auth_headers(affman))
+    assert resp.status_code == 403
+
+
+async def test_delete_lead_detaches_affiliate_events_instead_of_losing_them(client, db_session):
+    import uuid
+
+    from app.models.affiliate_event import AffiliateEvent
+    from app.models.enums import AffiliateEventType
+
+    admin = await make_user(db_session, UserRole.admin)
+    create_resp = await client.post("/api/v1/leads", json={"geo": "SY"}, headers=auth_headers(admin))
+    lead_id = create_resp.json()["lead_id"]
+
+    event = AffiliateEvent(
+        id=uuid.uuid4(),
+        lead_id=uuid.UUID(lead_id),
+        partner="binolla",
+        external_event_id="del-test-1",
+        event_type=AffiliateEventType.ftd,
+        raw_payload={},
+    )
+    db_session.add(event)
+    await db_session.commit()
+
+    resp = await client.delete(f"/api/v1/leads/{lead_id}", headers=auth_headers(admin))
+    assert resp.status_code == 204
+
+    await db_session.refresh(event)
+    assert event.lead_id is None

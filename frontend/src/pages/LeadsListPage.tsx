@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { api, ApiError } from "../api/client";
+import { useAuth } from "../auth/AuthContext";
+import { ARAB_COUNTRIES } from "../constants/geo";
 import type { Lead, LeadListResponse, LeadStatus } from "../types";
 
 const STATUS_OPTIONS: LeadStatus[] = [
@@ -18,6 +20,9 @@ const STATUS_OPTIONS: LeadStatus[] = [
 ];
 
 export function LeadsListPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+
   const [leads, setLeads] = useState<Lead[]>([]);
   const [geo, setGeo] = useState("");
   const [status, setStatus] = useState("");
@@ -72,6 +77,16 @@ export function LeadsListPage() {
     void fetchLeads(prev);
   }
 
+  async function handleDelete(leadId: string) {
+    if (!window.confirm("Удалить этого лида безвозвратно? Связанные коммуникации/задачи будут удалены.")) return;
+    try {
+      await api.delete(`/leads/${leadId}`);
+      await fetchLeads(cursor);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Не удалось удалить лида");
+    }
+  }
+
   return (
     <div className="page">
       <h1>Лиды</h1>
@@ -81,9 +96,11 @@ export function LeadsListPage() {
           GEO
           <select value={geo} onChange={(e) => setGeo(e.target.value)}>
             <option value="">Все</option>
-            <option value="SY">Сирия (SY)</option>
-            <option value="MA">Марокко (MA)</option>
-            <option value="SA">Саудовская Аравия (SA)</option>
+            {ARAB_COUNTRIES.map((c) => (
+              <option key={c.code} value={c.code}>
+                {c.name} ({c.code})
+              </option>
+            ))}
           </select>
         </label>
         <label>
@@ -110,6 +127,7 @@ export function LeadsListPage() {
             <th>Статус</th>
             <th>Канал</th>
             <th>Создан</th>
+            {isAdmin && <th></th>}
           </tr>
         </thead>
         <tbody>
@@ -124,11 +142,18 @@ export function LeadsListPage() {
               </td>
               <td>{lead.source_channel}</td>
               <td>{new Date(lead.created_at).toLocaleString()}</td>
+              {isAdmin && (
+                <td>
+                  <button onClick={() => handleDelete(lead.lead_id)} className="danger-link">
+                    Удалить
+                  </button>
+                </td>
+              )}
             </tr>
           ))}
           {!loading && leads.length === 0 && (
             <tr>
-              <td colSpan={5}>Лидов не найдено</td>
+              <td colSpan={isAdmin ? 6 : 5}>Лидов не найдено</td>
             </tr>
           )}
         </tbody>
