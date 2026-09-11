@@ -10,8 +10,11 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
+RUN chmod +x docker-entrypoint.sh
 
 # --no-access-log: дефолтный access-log uvicorn пишет query-строку без
 # редактирования (утечка секретов в query-параметрах вебхуков) - вместо
 # него RequestLoggingMiddleware (app/middleware/request_logging.py).
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
+# Энтрипоинт прогоняет alembic upgrade head перед стартом и слушает $PORT
+# (обязательно для Render - платформа сама назначает порт).
+ENTRYPOINT ["./docker-entrypoint.sh"]
