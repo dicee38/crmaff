@@ -96,14 +96,26 @@ async def chatterfy_webhook(
     response_model=BinollaWebhookResponse,
     dependencies=[Depends(RateLimiter(times=300, seconds=60))],
 )
+@router.get(
+    "/binolla/{path_secret}",
+    response_model=BinollaWebhookResponse,
+    dependencies=[Depends(RateLimiter(times=300, seconds=60))],
+)
 async def binolla_webhook(
     request: Request,
     db: AsyncSession = Depends(get_db),
+    path_secret: str | None = None,
 ) -> BinollaWebhookResponse:
+    # Секрет принимается либо как сегмент пути (/binolla/{secret} - нужно для
+    # партнёров вроде Binolla, чей UI автогенерирует query-строку "Postback
+    # format" из фиксированного набора полей и не даёт добавить туда свой
+    # query-параметр), либо как query-параметр ?secret=... (более гибкие
+    # платформы, позволяющие редактировать URL целиком).
     params = request.query_params
+    provided_secret = path_secret or params.get("secret")
 
-    # 1. Проверить секрет (GET без тела - HMAC-подпись неприменима, секрет в query).
-    if not verify_shared_secret(settings.binolla_webhook_secret, params.get("secret")):
+    # 1. Проверить секрет (GET без тела - HMAC-подпись неприменима).
+    if not verify_shared_secret(settings.binolla_webhook_secret, provided_secret):
         logger.warning("binolla_webhook.invalid_secret")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid secret")
 

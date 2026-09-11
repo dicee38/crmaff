@@ -26,6 +26,23 @@ async def _create_lead_with_click_id(client, db_session, click_id: str) -> str:
     return lead_id
 
 
+async def test_binolla_webhook_secret_in_path_accepted(client, db_session):
+    # Binolla-подобные UI автогенерируют query-строку из фиксированного набора
+    # полей и не дают вписать свой ?secret=... - поэтому секрет также
+    # принимается как сегмент пути перед стандартными query-параметрами.
+    lead_id = await _create_lead_with_click_id(client, db_session, "click-path-secret-1")
+    resp = await client.get(
+        f"/api/v1/webhooks/binolla/{SECRET}?status=reg&eid=path-evt-1&cid=click-path-secret-1"
+    )
+    assert resp.status_code == 200
+    assert resp.json()["lead_id"] == lead_id
+
+
+async def test_binolla_webhook_wrong_path_secret_rejected(client):
+    resp = await client.get("/api/v1/webhooks/binolla/wrong-secret?status=reg&eid=e1&cid=c1")
+    assert resp.status_code == 401
+
+
 async def test_binolla_webhook_invalid_secret_rejected(client):
     resp = await client.get(_url(secret="wrong", status="reg", eid="e1", cid="c1"))
     assert resp.status_code == 401
