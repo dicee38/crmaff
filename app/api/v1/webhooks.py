@@ -119,11 +119,16 @@ async def binolla_webhook(
         logger.warning("binolla_webhook.invalid_secret")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid secret")
 
-    # 2. Провалидировать структуру payload.
+    # 2. Провалидировать структуру payload. click_id НЕ обязателен на этом
+    # этапе - Binolla шлёт его пустой строкой при тестовой отправке постбэка
+    # из своего кабинета (нет реального клика для подстановки), и в принципе
+    # может не быть у события без предшествующего клика. Пустой/несматченный
+    # click_id - это сценарий "unmatched", а не структурная ошибка payload'а
+    # (см. правило "не отбрасывать событие" в CLAUDE.md).
     event_status = params.get("status")
     external_event_id = params.get("eid")
-    click_id = params.get("cid")
-    if not event_status or not external_event_id or not click_id:
+    click_id = params.get("cid") or None
+    if not event_status or not external_event_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing required fields")
 
     event_type_value = STATUS_TO_EVENT_TYPE.get(event_status)
@@ -143,8 +148,8 @@ async def binolla_webhook(
             unmatched=existing.lead_id is None,
         )
 
-    # 4. Определить lead_id по click_id (cid).
-    lead = await get_lead_by_external_click_id(db, click_id)
+    # 4. Определить lead_id по click_id (cid), если он вообще пришёл.
+    lead = await get_lead_by_external_click_id(db, click_id) if click_id else None
 
     # 6. Нормализация: payout -> Decimal (пусто/нет для нефинансовых событий).
     amount: Decimal | None = None
@@ -192,7 +197,7 @@ async def binolla_webhook(
         actor_id=None,
         action="affiliate_event_unmatched" if lead is None else "affiliate_event_received",
         entity_type="lead",
-        entity_id=str(lead.lead_id) if lead else click_id,
+        entity_id=str(lead.lead_id) if lead else (click_id or external_event_id),
         meta={
             "external_event_id": external_event_id,
             "affiliate_event_id": str(affiliate_event.id),

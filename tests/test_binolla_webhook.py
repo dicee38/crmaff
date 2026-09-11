@@ -53,6 +53,20 @@ async def test_binolla_webhook_missing_fields_rejected(client):
     assert resp.status_code == 400
 
 
+async def test_binolla_webhook_empty_cid_accepted_as_unmatched(client):
+    # Реальный кейс: тестовая отправка постбэка из кабинета Binolla шлёт
+    # cid/sid пустыми строками (нет реального клика для подстановки) -
+    # это не структурная ошибка, событие должно приниматься как unmatched,
+    # а не отбрасываться с 400.
+    resp = await client.get(
+        f"{BASE}?secret={SECRET}&status=reg&reg=true&eid=empty-cid-1&cid=&sid=&lid=28942&uid=605288&payout="
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["lead_id"] is None
+    assert body["unmatched"] is True
+
+
 async def test_binolla_webhook_registration_matches_lead_and_updates_status(client, db_session):
     lead_id = await _create_lead_with_click_id(client, db_session, "click-bin-1")
 
