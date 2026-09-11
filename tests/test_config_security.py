@@ -41,3 +41,21 @@ def test_real_secrets_pass_outside_development():
         track_click_signing_secret="a-sufficiently-long-real-secret-value",
     )
     settings.assert_secrets_configured()  # не должно бросать
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("postgres://u:p@host:5432/db", "postgresql+asyncpg://u:p@host:5432/db"),
+        ("postgresql://u:p@host:5432/db", "postgresql+asyncpg://u:p@host:5432/db"),
+        ("postgresql+asyncpg://u:p@host:5432/db", "postgresql+asyncpg://u:p@host:5432/db"),
+        ("sqlite+aiosqlite:///:memory:", "sqlite+aiosqlite:///:memory:"),
+    ],
+)
+def test_async_database_url_normalizes_bare_postgres_urls(raw, expected):
+    # Managed Postgres (Render и т.п.) отдаёт "postgres://"/"postgresql://" без
+    # драйвера - create_async_engine с таким URL падает ("asyncio extension
+    # requires an async driver"). Регрессия ловилась именно на проде при
+    # первом деплое на Render.
+    settings = Settings(database_url=raw)
+    assert settings.async_database_url == expected

@@ -23,7 +23,7 @@ else:
     engine_kwargs["max_overflow"] = 40
     engine_kwargs["pool_pre_ping"] = True
 
-engine = create_async_engine(settings.database_url, **engine_kwargs)
+engine = create_async_engine(settings.async_database_url, **engine_kwargs)
 
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,

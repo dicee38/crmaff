@@ -32,6 +32,22 @@ class Settings(BaseSettings):
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
+    @property
+    def async_database_url(self) -> str:
+        """DATABASE_URL с гарантированным async-драйвером.
+
+        Managed Postgres (Render, Heroku и т.п.) отдаёт connection string в
+        виде "postgres://" / "postgresql://" без указания драйвера - это годится
+        для psycopg2 (sync), но create_async_engine с таким URL падает:
+        "The asyncio extension requires an async driver". Подставляем
+        +asyncpg, если драйвер не указан явно."""
+        url = self.database_url
+        if url.startswith("postgres://"):
+            return "postgresql+asyncpg://" + url[len("postgres://") :]
+        if url.startswith("postgresql://"):
+            return "postgresql+asyncpg://" + url[len("postgresql://") :]
+        return url
+
     def assert_secrets_configured(self) -> None:
         """Отказываем в старте вне development, если секреты остались
         плейсхолдерами - иначе JWT/webhook-подписи подделываются тривиально.
