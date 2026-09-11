@@ -71,3 +71,25 @@ python scripts/run_load_test.py --base-url http://127.0.0.1:8000 --concurrency 3
 Прогон на 20k лидов, concurrency=30 (1200 запросов): P95 ≈ 210ms (список), ≈ 250ms (карточка) — укладывается в бюджет. Все под-запросы карточки выполняются с использованием индексов (`ix_*_lead_id`) за <0.1ms на стороне Postgres (проверено `EXPLAIN ANALYZE`); наблюдавшаяся до фикса деградация (P95 > 450ms на concurrency=20-30) была вызвана слишком маленьким пулом соединений SQLAlchemy (дефолт 5+10) — см. `app/database.py` (`pool_size=40, max_overflow=40` для Postgres).
 
 Синтетические данные не коммитятся и не остаются в БД — скрипт помечает их `loadtest-*` префиксами, чистить вручную (см. `DELETE ... WHERE external_click_id LIKE 'loadtest-click-%'` и аналогично для `tracking_events`/`affiliate_events`/`users`) после прогона.
+
+## Deploy (Render)
+
+Хостинг по CLAUDE.md — Railway, но на момент первого деплоя упёрлись в лимиты бесплатного плана (Railway) и обязательную верификацию картой (Fly.io) — переехали на Render.
+
+**Backend + Postgres + Redis** — через Blueprint (`render.yaml` в корне репо):
+1. dashboard.render.com → **New +** → **Blueprint** → выбрать репозиторий `dicee38/crmaff`.
+2. Render находит `render.yaml`, создаёт `crm-postgres`, `crm-redis`, `crm-backend` (Docker, из `Dockerfile`).
+3. Секреты (`JWT_SECRET_KEY`, `BINOLLA_WEBHOOK_SECRET` и т.д.) генерируются автоматически (`generateValue: true`), `DATABASE_URL`/`REDIS_URL` подставляются через `fromDatabase`/`fromService`.
+4. `docker-entrypoint.sh` на каждом старте прогоняет `alembic upgrade head`.
+
+**Frontend** — вручную, не через Blueprint (схема `type: static` в render.yaml не была принята Render'ом — "unknown type static" — возможно, версия Blueprint API на момент деплоя отличалась от документации; переиспробовали `type: web`+`runtime: static` и `type: static`, ни один не сработал так, как ожидалось):
+1. dashboard.render.com → **New +** → **Static Site** → репозиторий `dicee38/crmaff`.
+2. **Root Directory**: `frontend`
+3. **Build Command**: `npm install && npm run build`
+4. **Publish Directory**: `dist`
+5. Env var **`VITE_API_BASE_URL`** = `https://<url-backend>/api/v1`
+6. **Redirects/Rewrites**: добавить правило `/*` → `/index.html` (rewrite, не redirect) — иначе прямой переход на `/leads/:id` в react-router даст 404.
+
+После деплоя фронтенда — обновить `CORS_ORIGINS` у `crm-backend` (Environment) на реальный URL фронтенда, иначе браузер будет блокировать запросы к API.
+
+**Важно про Postgres на Render**: free-тариф ограничен 30 днями, потом требует пересоздания или апгрейда.

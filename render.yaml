@@ -48,14 +48,7 @@ services:
       - key: SENTRY_DSN
         value: ""
 
-  - type: static
-    name: crm-frontend
-    buildCommand: cd frontend && npm install && npm run build
-    staticPublishPath: frontend/dist
-    envVars:
-      - key: VITE_API_BASE_URL
-        value: https://crm-backend-ojja.onrender.com/api/v1
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
+# crm-frontend создан вручную через дашборд (New + -> Static Site), не через
+# Blueprint - схема render.yaml для type: static не совпала ни с одним из
+# опробованных вариантов ("unknown type static" / фолбэк на автоопределение
+# Python). См. README.md, раздел Deploy.
