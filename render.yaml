@@ -48,9 +48,8 @@ services:
       - key: SENTRY_DSN
         value: ""
 
-  - type: web
+  - type: static
     name: crm-frontend
-    runtime: static
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: frontend/dist
     envVars:
