@@ -44,7 +44,7 @@ services:
       - key: RATE_LIMIT_PUBLIC_PER_MINUTE
         value: "60"
       - key: CORS_ORIGINS
-        value: "http://localhost:5173"
+        value: "https://crmaff.onrender.com"
       - key: SENTRY_DSN
         value: ""
 
