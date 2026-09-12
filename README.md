@@ -1,4 +1,4 @@
-# Binolla Affiliate CRM
+# Verdance CRM
 
 Контекст и архитектура проекта — см. [CLAUDE.md](./CLAUDE.md).
 
@@ -77,13 +77,13 @@ python scripts/run_load_test.py --base-url http://127.0.0.1:8000 --concurrency 3
 Хостинг по CLAUDE.md — Railway, но на момент первого деплоя упёрлись в лимиты бесплатного плана (Railway) и обязательную верификацию картой (Fly.io) — переехали на Render.
 
 **Backend + Postgres + Redis** — через Blueprint (`render.yaml` в корне репо):
-1. dashboard.render.com → **New +** → **Blueprint** → выбрать репозиторий `dicee38/crmaff`.
+1. dashboard.render.com → **New +** → **Blueprint** → выбрать репозиторий `dicee38/verdance`.
 2. Render находит `render.yaml`, создаёт `crm-postgres`, `crm-redis`, `crm-backend` (Docker, из `Dockerfile`).
 3. Секреты (`JWT_SECRET_KEY`, `BINOLLA_WEBHOOK_SECRET` и т.д.) генерируются автоматически (`generateValue: true`), `DATABASE_URL`/`REDIS_URL` подставляются через `fromDatabase`/`fromService`.
 4. `docker-entrypoint.sh` на каждом старте прогоняет `alembic upgrade head`.
 
 **Frontend** — вручную, не через Blueprint (схема `type: static` в render.yaml не была принята Render'ом — "unknown type static" — возможно, версия Blueprint API на момент деплоя отличалась от документации; переиспробовали `type: web`+`runtime: static` и `type: static`, ни один не сработал так, как ожидалось):
-1. dashboard.render.com → **New +** → **Static Site** → репозиторий `dicee38/crmaff`.
+1. dashboard.render.com → **New +** → **Static Site** → репозиторий `dicee38/verdance`.
 2. **Root Directory**: `frontend`
 3. **Build Command**: `npm install && npm run build`
 4. **Publish Directory**: `dist`

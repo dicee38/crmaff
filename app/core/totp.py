@@ -1,6 +1,6 @@
 import pyotp
 
-ISSUER = "Binolla CRM"
+ISSUER = "Verdance"
 
 
 def generate_totp_secret() -> str:

@@ -58,7 +58,6 @@ export function Layout({ children }: { children: ReactNode }) {
   return (
     <div style={shell}>
       <AppHeader
-        logoWordmark="Binolla CRM"
         nav={
           user
             ? visibleItems.map((item) => (

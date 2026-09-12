@@ -14,7 +14,7 @@ settings.assert_secrets_configured()
 if settings.sentry_dsn:
     sentry_sdk.init(dsn=settings.sentry_dsn, environment=settings.environment, traces_sample_rate=0.1)
 
-app = FastAPI(title="Binolla Affiliate CRM", version="0.1.0")
+app = FastAPI(title="Verdance CRM", version="0.1.0")
 
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(

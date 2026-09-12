@@ -9,7 +9,7 @@ export interface AppHeaderProps {
   user?: ReactNode;
   /** Trailing control slot (sign out). */
   action?: ReactNode;
-  /** Text next to the mark - override for products other than Verdance itself. */
+  /** Text next to the mark. Defaults to "Verdance". */
   logoWordmark?: string;
   style?: CSSProperties;
 }

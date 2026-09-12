@@ -56,10 +56,10 @@ export function LoginPage() {
   return (
     <div style={loginPage}>
       <form style={loginForm} onSubmit={handleSubmit}>
-        <Logo size={28} wordmark="Binolla CRM" />
+        <Logo size={28} />
         <div>
           <h1 style={loginTitle}>Вход в CRM</h1>
-          <FormMessage tone="hint">Партнёрская платформа Binolla · MENA</FormMessage>
+          <FormMessage tone="hint">Партнёрская платформа Verdance · MENA</FormMessage>
         </div>
         <Field label="Email">
           <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />

@@ -5,8 +5,7 @@ export interface LogoProps {
   size?: number;
   tone?: "forest" | "graphite" | "reverse" | "mono";
   showWordmark?: boolean;
-  /** Text next to the mark. Defaults to the design system's own name; this
-   * product is Binolla CRM, not Verdance - callers should override it. */
+  /** Text next to the mark. Defaults to "Verdance". */
   wordmark?: string;
   style?: CSSProperties;
 }
