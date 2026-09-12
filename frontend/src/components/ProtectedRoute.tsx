@@ -14,7 +14,7 @@ export function ProtectedRoute({
 }) {
   const { user, isLoading } = useAuth();
 
-  if (isLoading) return <div className="page">Загрузка...</div>;
+  if (isLoading) return <div style={{ padding: "var(--space-8)" }}>Загрузка...</div>;
   if (!user) return <Navigate to="/login" replace />;
   if (roles && !roles.includes(user.role)) return <Navigate to="/leads" replace />;
 

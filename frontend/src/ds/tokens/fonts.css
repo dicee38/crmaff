@@ -1,0 +1,7 @@
+/* Verdance webfonts.
+   Substitution note: the brief names Neue Montreal / GT America / Söhne (display) and
+   Inter / Helvetica Now (body). No licensed binaries were provided, so the nearest
+   Google Fonts equivalents are used: Archivo (display grotesk, wide tracking range),
+   Instrument Sans (neutral body grotesk), IBM Plex Mono (tabular/ID data).
+   Drop real .woff2 files into assets/fonts/ and swap the @font-face src to go licensed. */
+@import url("https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap");

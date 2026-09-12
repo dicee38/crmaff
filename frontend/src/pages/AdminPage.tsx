@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 
 import { api, ApiError } from "../api/client";
+import { Badge, Button, Card, DataTable, Field, FormMessage, Input, PageHeader } from "../ds";
 import type { Channel, Partner } from "../types";
 
 export function AdminPage() {
@@ -16,10 +17,7 @@ export function AdminPage() {
     setLoading(true);
     setError(null);
     try {
-      const [partnersResp, channelsResp] = await Promise.all([
-        api.get<Partner[]>("/partners"),
-        api.get<Channel[]>("/channels"),
-      ]);
+      const [partnersResp, channelsResp] = await Promise.all([api.get<Partner[]>("/partners"), api.get<Channel[]>("/channels")]);
       setPartners(partnersResp);
       setChannels(channelsResp);
     } catch (err) {
@@ -76,90 +74,74 @@ export function AdminPage() {
   }
 
   return (
-    <div className="page">
-      <h1>Админ-панель</h1>
-      {error && <p className="form-error">{error}</p>}
-      {loading && <p>Загрузка...</p>}
+    <div>
+      <PageHeader eyebrow="Управление" title="Админ-панель" />
+      {error ? <FormMessage tone="error">{error}</FormMessage> : null}
+      {loading ? <p>Загрузка...</p> : null}
 
-      <section className="card-block">
-        <h2>Партнёрские сети</h2>
-        <form className="actions-form" onSubmit={handleAddPartner}>
-          <label>
-            Название
-            <input value={newPartner} onChange={(e) => setNewPartner(e.target.value)} placeholder="PocketOption" />
-          </label>
-          <button type="submit">Добавить</button>
-        </form>
-        <table className="leads-table">
-          <thead>
-            <tr>
-              <th>Название</th>
-              <th>Статус</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {partners.map((p) => (
-              <tr key={p.id}>
-                <td>{p.name}</td>
-                <td>
-                  <span className={`status-badge ${p.is_active ? "status-active" : "status-churned"}`}>
-                    {p.is_active ? "активен" : "выключен"}
-                  </span>
-                </td>
-                <td>
-                  <button onClick={() => togglePartner(p)}>{p.is_active ? "Выключить" : "Включить"}</button>
-                </td>
-              </tr>
-            ))}
-            {partners.length === 0 && !loading && (
-              <tr>
-                <td colSpan={3}>Партнёров пока нет</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </section>
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-6)" }}>
+        <Card title="Партнёрские сети">
+          <form onSubmit={handleAddPartner} style={{ display: "flex", gap: "var(--space-4)", alignItems: "end", marginBottom: "var(--space-5)" }}>
+            <Field label="Название" style={{ flex: "1 1 260px" }}>
+              <Input value={newPartner} onChange={(e) => setNewPartner(e.target.value)} placeholder="PocketOption" />
+            </Field>
+            <Button type="submit">Добавить</Button>
+          </form>
+          <DataTable
+            rows={partners}
+            rowKey={(p) => p.id}
+            emptyLabel="Партнёров пока нет"
+            columns={[
+              { key: "name", header: "Название" },
+              {
+                key: "is_active",
+                header: "Статус",
+                render: (p) => <Badge tone={p.is_active ? "positive" : "neutral"}>{p.is_active ? "активен" : "выключен"}</Badge>,
+              },
+              {
+                key: "_toggle",
+                header: "",
+                render: (p) => (
+                  <Button size="sm" variant="secondary" onClick={() => void togglePartner(p)}>
+                    {p.is_active ? "Выключить" : "Включить"}
+                  </Button>
+                ),
+              },
+            ]}
+          />
+        </Card>
 
-      <section className="card-block">
-        <h2>Каналы</h2>
-        <form className="actions-form" onSubmit={handleAddChannel}>
-          <label>
-            Название
-            <input value={newChannel} onChange={(e) => setNewChannel(e.target.value)} placeholder="MENA-Karim" />
-          </label>
-          <button type="submit">Добавить</button>
-        </form>
-        <table className="leads-table">
-          <thead>
-            <tr>
-              <th>Название</th>
-              <th>Статус</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {channels.map((c) => (
-              <tr key={c.id}>
-                <td>{c.name}</td>
-                <td>
-                  <span className={`status-badge ${c.is_active ? "status-active" : "status-churned"}`}>
-                    {c.is_active ? "активен" : "выключен"}
-                  </span>
-                </td>
-                <td>
-                  <button onClick={() => toggleChannel(c)}>{c.is_active ? "Выключить" : "Включить"}</button>
-                </td>
-              </tr>
-            ))}
-            {channels.length === 0 && !loading && (
-              <tr>
-                <td colSpan={3}>Каналов пока нет</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </section>
+        <Card title="Каналы">
+          <form onSubmit={handleAddChannel} style={{ display: "flex", gap: "var(--space-4)", alignItems: "end", marginBottom: "var(--space-5)" }}>
+            <Field label="Название" style={{ flex: "1 1 260px" }}>
+              <Input value={newChannel} onChange={(e) => setNewChannel(e.target.value)} placeholder="MENA-Karim" />
+            </Field>
+            <Button type="submit">Добавить</Button>
+          </form>
+          <DataTable
+            rows={channels}
+            rowKey={(c) => c.id}
+            emptyLabel="Каналов пока нет"
+            columns={[
+              { key: "name", header: "Название" },
+              {
+                key: "is_active",
+                header: "Статус",
+                render: (c) => <Badge tone={c.is_active ? "positive" : "neutral"}>{c.is_active ? "активен" : "выключен"}</Badge>,
+              },
+              {
+                key: "_toggle",
+                header: "",
+                render: (c) => (
+                  <Button size="sm" variant="secondary" onClick={() => void toggleChannel(c)}>
+                    {c.is_active ? "Выключить" : "Включить"}
+                  </Button>
+                ),
+              },
+            ]}
+          />
+        </Card>
+      </div>
     </div>
   );
 }

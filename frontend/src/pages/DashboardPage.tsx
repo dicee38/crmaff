@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
+import type { CSSProperties } from "react";
 
 import { api, ApiError } from "../api/client";
+import { ARAB_COUNTRIES } from "../constants/geo";
+import { Card, Field, FilterBar, FormMessage, FunnelRow, KpiTile, PageHeader, Select } from "../ds";
 import type { FunnelData, KpiData } from "../types";
+
+const kpiGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: "var(--space-4)", marginBottom: "var(--space-5)" };
 
 export function DashboardPage() {
   const [funnel, setFunnel] = useState<FunnelData | null>(null);
@@ -14,10 +19,7 @@ export function DashboardPage() {
     setLoading(true);
     setError(null);
     const params = geo ? `?geo=${geo}` : "";
-    Promise.all([
-      api.get<FunnelData>(`/dashboard/funnel${params}`),
-      api.get<KpiData>(`/dashboard/kpi${params}`),
-    ])
+    Promise.all([api.get<FunnelData>(`/dashboard/funnel${params}`), api.get<KpiData>(`/dashboard/kpi${params}`)])
       .then(([f, k]) => {
         setFunnel(f);
         setKpi(k);
@@ -26,84 +28,56 @@ export function DashboardPage() {
       .finally(() => setLoading(false));
   }, [geo]);
 
-  const funnelStages: { key: keyof FunnelData; label: string }[] = [
-    { key: "clicks", label: "Клики" },
-    { key: "leads_created", label: "Лиды" },
-    { key: "manager_assigned", label: "Назначен менеджер" },
-    { key: "registered", label: "Регистрация" },
-    { key: "ftd", label: "FTD" },
+  const funnelStages: { key: keyof FunnelData; label: string; tone?: "brand" | "soft" | "data" | "accent" }[] = [
+    { key: "clicks", label: "Клики", tone: "data" },
+    { key: "leads_created", label: "Лиды", tone: "data" },
+    { key: "manager_assigned", label: "Назначен менеджер", tone: "soft" },
+    { key: "registered", label: "Регистрация", tone: "brand" },
+    { key: "ftd", label: "FTD", tone: "accent" },
   ];
 
   const maxValue = funnel ? Math.max(...funnelStages.map((s) => Number(funnel[s.key]))) : 0;
 
   return (
-    <div className="page">
-      <h1>Dashboard</h1>
+    <div>
+      <PageHeader eyebrow="Аналитика" title="Dashboard" />
 
-      <div className="filters">
-        <label>
-          GEO
-          <select value={geo} onChange={(e) => setGeo(e.target.value)}>
-            <option value="">Все</option>
-            <option value="SY">Сирия (SY)</option>
-            <option value="MA">Марокко (MA)</option>
-            <option value="SA">Саудовская Аравия (SA)</option>
-          </select>
-        </label>
-      </div>
+      <FilterBar>
+        <Field label="GEO" style={{ width: 220 }}>
+          <Select
+            placeholder="Все"
+            value={geo}
+            onChange={(e) => setGeo(e.target.value)}
+            options={ARAB_COUNTRIES.map((c) => ({ value: c.code, label: `${c.name} (${c.code})` }))}
+          />
+        </Field>
+      </FilterBar>
 
-      {error && <p className="form-error">{error}</p>}
-      {loading && <p>Загрузка...</p>}
+      {error ? <FormMessage tone="error">{error}</FormMessage> : null}
+      {loading ? <p>Загрузка...</p> : null}
 
-      {kpi && (
-        <div className="kpi-grid">
-          <div className="kpi-tile">
-            <span className="kpi-value">{kpi.total_leads}</span>
-            <span className="kpi-label">Лидов всего</span>
-          </div>
-          <div className="kpi-tile">
-            <span className="kpi-value">{kpi.total_registered}</span>
-            <span className="kpi-label">Регистраций</span>
-          </div>
-          <div className="kpi-tile">
-            <span className="kpi-value">{kpi.total_ftd}</span>
-            <span className="kpi-label">FTD</span>
-          </div>
-          <div className="kpi-tile">
-            <span className="kpi-value">{kpi.total_revenue}</span>
-            <span className="kpi-label">Revenue</span>
-          </div>
-          <div className="kpi-tile">
-            <span className="kpi-value">{kpi.lead2reg_pct}%</span>
-            <span className="kpi-label">Lead → Reg</span>
-          </div>
-          <div className="kpi-tile">
-            <span className="kpi-value">{kpi.reg2fd_pct}%</span>
-            <span className="kpi-label">Reg → FTD</span>
-          </div>
+      {kpi ? (
+        <div style={kpiGrid}>
+          <KpiTile label="Лидов всего" value={kpi.total_leads} tone="data" />
+          <KpiTile label="Регистраций" value={kpi.total_registered} tone="data" />
+          <KpiTile label="FTD" value={kpi.total_ftd} />
+          <KpiTile label="Lead → Reg" value={kpi.lead2reg_pct} unit="%" />
+          <KpiTile label="Reg → FTD" value={kpi.reg2fd_pct} unit="%" />
+          <KpiTile label="Revenue" value={kpi.total_revenue} unit="$" accent />
         </div>
-      )}
+      ) : null}
 
-      {funnel && (
-        <section className="card-block">
-          <h2>Воронка</h2>
-          <div className="funnel">
+      {funnel ? (
+        <Card title="Воронка">
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
             {funnelStages.map((stage) => {
               const value = Number(funnel[stage.key]);
-              const widthPct = maxValue > 0 ? Math.max((value / maxValue) * 100, 4) : 4;
-              return (
-                <div className="funnel-row" key={stage.key}>
-                  <span className="funnel-label">{stage.label}</span>
-                  <div className="funnel-bar-track">
-                    <div className="funnel-bar" style={{ width: `${widthPct}%` }} />
-                  </div>
-                  <span className="funnel-value">{value}</span>
-                </div>
-              );
+              const percent = maxValue > 0 ? (value / maxValue) * 100 : 0;
+              return <FunnelRow key={stage.key} label={stage.label} value={value} percent={percent} tone={stage.tone} />;
             })}
           </div>
-        </section>
-      )}
+        </Card>
+      ) : null}
     </div>
   );
 }

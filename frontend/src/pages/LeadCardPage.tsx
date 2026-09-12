@@ -1,11 +1,41 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import type { CSSProperties } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 
 import { api, ApiError } from "../api/client";
+import { Card, DataTable, DefinitionList, FormMessage, StatusBadge, Timeline } from "../ds";
 import type { LeadCard } from "../types";
+
+const backLink: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "var(--space-3)",
+  fontFamily: "var(--font-body)",
+  fontSize: "var(--text-caption)",
+  color: "var(--text-link)",
+  textDecoration: "none",
+  background: "none",
+  border: "none",
+  padding: 0,
+  cursor: "pointer",
+  marginBottom: "var(--space-5)",
+};
+const cardGrid: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: "var(--space-5)" };
+const idStyle: CSSProperties = { fontFamily: "var(--font-mono)", fontSize: "var(--text-h2)" };
+const eyebrow: CSSProperties = {
+  display: "block",
+  fontFamily: "var(--font-body)",
+  fontSize: "var(--text-micro)",
+  fontWeight: "var(--weight-semibold)",
+  letterSpacing: "var(--tracking-eyebrow)",
+  textTransform: "uppercase",
+  color: "var(--navy-600)",
+  marginBottom: "var(--space-3)",
+};
 
 export function LeadCardPage() {
   const { leadId } = useParams<{ leadId: string }>();
+  const navigate = useNavigate();
   const [card, setCard] = useState<LeadCard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -21,120 +51,104 @@ export function LeadCardPage() {
       .finally(() => setLoading(false));
   }, [leadId]);
 
-  if (loading) return <div className="page">Загрузка...</div>;
-  if (error) return <div className="page form-error">{error}</div>;
+  if (loading) return <p>Загрузка...</p>;
+  if (error) return <FormMessage tone="error">{error}</FormMessage>;
   if (!card) return null;
 
   const { profile, acquisition, manager, communications, affiliate } = card;
 
   return (
-    <div className="page">
-      <p>
-        <Link to="/leads">&larr; К списку лидов</Link>
-      </p>
-      <h1>Лид {profile.lead_id}</h1>
+    <div>
+      <button style={backLink} onClick={() => navigate("/leads")}>
+        ← К списку лидов
+      </button>
 
-      <section className="card-block">
-        <h2>Профиль</h2>
-        <dl>
-          <dt>GEO</dt>
-          <dd>{profile.geo ?? "—"}</dd>
-          <dt>Язык / диалект</dt>
-          <dd>
-            {profile.language ?? "—"} / {profile.dialect ?? "—"}
-          </dd>
-          <dt>Статус</dt>
-          <dd>
-            <span className={`status-badge status-${profile.status}`}>{profile.status}</span>
-          </dd>
-          <dt>Telegram user id</dt>
-          <dd>{profile.telegram_user_id ?? "—"}</dd>
-          <dt>Согласие на коммуникацию</dt>
-          <dd>{profile.consent_status}</dd>
-          <dt>Создан</dt>
-          <dd>{new Date(profile.created_at).toLocaleString()}</dd>
-        </dl>
-      </section>
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "var(--space-6)", marginBottom: "var(--space-6)" }}>
+        <div style={{ minWidth: 0 }}>
+          <span style={eyebrow}>Карточка лида</span>
+          <h1 style={idStyle}>{profile.lead_id}</h1>
+        </div>
+        <StatusBadge status={profile.status} />
+      </div>
 
-      <section className="card-block">
-        <h2>Acquisition</h2>
-        {acquisition ? (
-          <dl>
-            <dt>Канал</dt>
-            <dd>{acquisition.source_channel}</dd>
-            <dt>Click ID</dt>
-            <dd>{acquisition.click_id ?? "—"}</dd>
-            <dt>Campaign / Adset / Creative</dt>
-            <dd>
-              {acquisition.campaign_id ?? "—"} / {acquisition.adset_id ?? "—"} / {acquisition.creative_id ?? "—"}
-            </dd>
-            <dt>Landing</dt>
-            <dd>{acquisition.landing_id ?? "—"}</dd>
-            <dt>Первый визит</dt>
-            <dd>{acquisition.first_seen_at ? new Date(acquisition.first_seen_at).toLocaleString() : "—"}</dd>
-          </dl>
-        ) : (
-          <p className="empty-block">Нет данных о привлечении</p>
-        )}
-      </section>
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
+        <div style={cardGrid}>
+          <Card title="Профиль">
+            <DefinitionList
+              items={[
+                { term: "GEO", value: profile.geo },
+                { term: "Язык / диалект", value: `${profile.language ?? "—"} / ${profile.dialect ?? "—"}` },
+                { term: "Telegram user id", value: profile.telegram_user_id, mono: true },
+                { term: "Согласие", value: profile.consent_status },
+                { term: "Создан", value: new Date(profile.created_at).toLocaleString(), mono: true },
+              ]}
+            />
+          </Card>
+          <Card title="Acquisition">
+            {acquisition ? (
+              <DefinitionList
+                items={[
+                  { term: "Канал", value: acquisition.source_channel },
+                  { term: "Click ID", value: acquisition.click_id, mono: true },
+                  {
+                    term: "Campaign / Adset / Creative",
+                    value: `${acquisition.campaign_id ?? "—"} / ${acquisition.adset_id ?? "—"} / ${acquisition.creative_id ?? "—"}`,
+                    mono: true,
+                  },
+                  { term: "Landing", value: acquisition.landing_id, mono: true },
+                  {
+                    term: "Первый визит",
+                    value: acquisition.first_seen_at ? new Date(acquisition.first_seen_at).toLocaleString() : null,
+                    mono: true,
+                  },
+                ]}
+              />
+            ) : (
+              <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "var(--text-body-sm)" }}>Нет данных о привлечении</p>
+            )}
+          </Card>
+        </div>
 
-      <section className="card-block">
-        <h2>Менеджер</h2>
-        {manager ? (
-          <dl>
-            <dt>Имя</dt>
-            <dd>{manager.full_name}</dd>
-            <dt>Email</dt>
-            <dd>{manager.email}</dd>
-          </dl>
-        ) : (
-          <p className="empty-block">Менеджер не назначен</p>
-        )}
-      </section>
+        <Card title="Менеджер">
+          {manager ? (
+            <DefinitionList items={[{ term: "Имя", value: manager.full_name }, { term: "Email", value: manager.email, mono: true }]} />
+          ) : (
+            <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "var(--text-body-sm)" }}>Менеджер не назначен</p>
+          )}
+        </Card>
 
-      <section className="card-block">
-        <h2>Коммуникации ({communications.length})</h2>
-        {communications.length > 0 ? (
-          <ul className="comm-list">
-            {communications.map((c) => (
-              <li key={c.id} className={`comm-item comm-${c.direction}`}>
-                <span className="comm-meta">
-                  {c.channel} · {c.direction} · {new Date(c.created_at).toLocaleString()}
-                </span>
-                <p>{c.message_text}</p>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="empty-block">Коммуникаций пока нет</p>
-        )}
-      </section>
+        <Card title={`Коммуникации (${communications.length})`}>
+          <Timeline
+            items={communications.map((c) => ({
+              id: c.id,
+              channel: c.channel,
+              direction: c.direction,
+              timestamp: new Date(c.created_at).toLocaleString(),
+              text: c.message_text ?? "",
+            }))}
+          />
+        </Card>
 
-      <section className="card-block">
-        <h2>Affiliate-события ({affiliate.length})</h2>
-        {affiliate.length > 0 ? (
-          <table className="affiliate-table">
-            <thead>
-              <tr>
-                <th>Событие</th>
-                <th>Сумма</th>
-                <th>Дата</th>
-              </tr>
-            </thead>
-            <tbody>
-              {affiliate.map((e) => (
-                <tr key={e.id}>
-                  <td>{e.event_type}</td>
-                  <td>{e.amount != null ? `${e.amount} ${e.currency ?? ""}` : "—"}</td>
-                  <td>{new Date(e.received_at).toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <p className="empty-block">Affiliate-событий пока нет</p>
-        )}
-      </section>
+        <Card title={`Affiliate-события (${affiliate.length})`} padding="sm">
+          <DataTable
+            dense
+            rows={affiliate}
+            rowKey={(r) => r.id}
+            emptyLabel="Affiliate-событий пока нет"
+            columns={[
+              { key: "event_type", header: "Событие" },
+              {
+                key: "amount",
+                header: "Сумма",
+                align: "right",
+                numeric: true,
+                render: (r) => (r.amount != null ? `${r.amount} ${r.currency ?? ""}` : "—"),
+              },
+              { key: "received_at", header: "Получено", mono: true, render: (r) => new Date(r.received_at).toLocaleString() },
+            ]}
+          />
+        </Card>
+      </div>
     </div>
   );
 }

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 
 import { api, ApiError } from "../api/client";
-import type { CashflowReport } from "../types";
+import { DataTable, Field, FilterBar, FormMessage, PageHeader, Select } from "../ds";
+import type { CashflowReport, CashflowRow } from "../types";
 
 export function CashflowReportPage() {
   const [report, setReport] = useState<CashflowReport | null>(null);
@@ -19,73 +20,48 @@ export function CashflowReportPage() {
       .finally(() => setLoading(false));
   }, [groupBy]);
 
+  const rows: (CashflowRow & { isTotal?: boolean })[] = report ? [{ ...report.total, label: "Общий итог", isTotal: true }, ...report.groups] : [];
+
   return (
-    <div className="page">
-      <h1>Cashflow-отчёт по МОП</h1>
+    <div>
+      <PageHeader eyebrow="Эффективность" title="Cashflow-отчёт по МОП" />
 
-      <div className="filters">
-        <label>
-          Группировка
-          <select value={groupBy} onChange={(e) => setGroupBy(e.target.value as "manager" | "channel")}>
-            <option value="manager">По менеджеру</option>
-            <option value="channel">По каналу</option>
-          </select>
-        </label>
-      </div>
+      <FilterBar>
+        <Field label="Группировка" style={{ width: 220 }}>
+          <Select
+            value={groupBy}
+            onChange={(e) => setGroupBy(e.target.value as "manager" | "channel")}
+            options={[
+              { value: "manager", label: "По менеджеру" },
+              { value: "channel", label: "По каналу" },
+            ]}
+          />
+        </Field>
+      </FilterBar>
 
-      {error && <p className="form-error">{error}</p>}
-      {loading && <p>Загрузка...</p>}
+      {error ? <FormMessage tone="error">{error}</FormMessage> : null}
+      {loading ? <p>Загрузка...</p> : null}
 
-      {report && (
-        <table className="cashflow-table">
-          <thead>
-            <tr>
-              <th></th>
-              <th>REG</th>
-              <th>FD (шт / сумма)</th>
-              <th>RD (шт / сумма)</th>
-              <th>Касса</th>
-              <th>Lead→Reg</th>
-              <th>Reg→FD</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="cashflow-total-row">
-              <td>Общий итог</td>
-              <td>{report.total.reg}</td>
-              <td>
-                {report.total.fd_count} / {report.total.fd_sum}
-              </td>
-              <td>
-                {report.total.rd_count} / {report.total.rd_sum}
-              </td>
-              <td>{report.total.cashflow}</td>
-              <td>{report.total.lead2reg_pct != null ? `${report.total.lead2reg_pct}%` : "—"}</td>
-              <td>{report.total.reg2fd_pct}%</td>
-            </tr>
-            {report.groups.map((row) => (
-              <tr key={row.key}>
-                <td className="cashflow-group-label">{row.label}</td>
-                <td>{row.reg}</td>
-                <td>
-                  {row.fd_count} / {row.fd_sum}
-                </td>
-                <td>
-                  {row.rd_count} / {row.rd_sum}
-                </td>
-                <td>{row.cashflow}</td>
-                <td>{row.lead2reg_pct != null ? `${row.lead2reg_pct}%` : "—"}</td>
-                <td>{row.reg2fd_pct}%</td>
-              </tr>
-            ))}
-            {report.groups.length === 0 && (
-              <tr>
-                <td colSpan={7}>Нет данных для разбивки (или доступны только свои данные)</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      )}
+      {report ? (
+        <DataTable
+          rows={rows}
+          rowKey={(r) => r.key ?? "total"}
+          emptyLabel="Нет данных для разбивки (или доступны только свои данные)"
+          columns={[
+            {
+              key: "label",
+              header: "",
+              render: (r) => <span style={r.isTotal ? { fontWeight: "var(--weight-semibold)" } : { color: "var(--text-muted)" }}>{r.label}</span>,
+            },
+            { key: "reg", header: "REG", align: "right", numeric: true },
+            { key: "fd", header: "FD (шт / сумма)", align: "right", render: (r) => `${r.fd_count} / ${r.fd_sum}` },
+            { key: "rd", header: "RD (шт / сумма)", align: "right", render: (r) => `${r.rd_count} / ${r.rd_sum}` },
+            { key: "cashflow", header: "Касса", align: "right", numeric: true },
+            { key: "lead2reg_pct", header: "Lead→Reg", align: "right", render: (r) => (r.lead2reg_pct != null ? `${r.lead2reg_pct}%` : "—") },
+            { key: "reg2fd_pct", header: "Reg→FTD", align: "right", render: (r) => `${r.reg2fd_pct}%` },
+          ]}
+        />
+      ) : null}
     </div>
   );
 }

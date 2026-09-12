@@ -2,7 +2,15 @@ import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 
 import { api, ApiError } from "../api/client";
+import { Badge, Button, Card, DataTable, Field, FilterBar, FormMessage, Input, PageHeader, Select } from "../ds";
 import type { Task, TaskListResponse, TaskStatus } from "../types";
+
+const TASK_STATUS_TONE: Record<TaskStatus, "neutral" | "positive" | "critical"> = {
+  open: "neutral",
+  done: "positive",
+  cancelled: "critical",
+};
+const TASK_STATUS_LABEL: Record<TaskStatus, string> = { open: "открыта", done: "выполнена", cancelled: "отменена" };
 
 export function TasksPage() {
   const [data, setData] = useState<TaskListResponse | null>(null);
@@ -59,80 +67,74 @@ export function TasksPage() {
   }
 
   return (
-    <div className="page">
-      <h1>Задачи</h1>
+    <div>
+      <PageHeader eyebrow="Работа с лидами" title="Задачи" />
 
-      <section className="card-block">
-        <h2>Новая задача</h2>
-        <form className="actions-form" onSubmit={handleCreate}>
-          <label>
-            Lead ID
-            <input value={leadId} onChange={(e) => setLeadId(e.target.value)} required />
-          </label>
-          <label>
-            Заголовок
-            <input value={title} onChange={(e) => setTitle(e.target.value)} required />
-          </label>
-          {formError && <p className="form-error">{formError}</p>}
-          <button type="submit" disabled={submitting}>
-            {submitting ? "Создание..." : "Создать"}
-          </button>
+      <Card title="Новая задача" style={{ marginBottom: "var(--space-6)" }}>
+        <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
+          <div style={{ display: "flex", gap: "var(--space-5)", flexWrap: "wrap" }}>
+            <Field label="Lead ID" style={{ flex: "1 1 260px" }}>
+              <Input mono value={leadId} onChange={(e) => setLeadId(e.target.value)} required />
+            </Field>
+            <Field label="Заголовок" style={{ flex: "2 1 320px" }}>
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} required />
+            </Field>
+          </div>
+          {formError ? <FormMessage tone="error">{formError}</FormMessage> : null}
+          <div>
+            <Button type="submit" disabled={submitting}>
+              {submitting ? "Создание..." : "Создать"}
+            </Button>
+          </div>
         </form>
-      </section>
+      </Card>
 
-      <div className="filters">
-        <label>
-          Статус
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as TaskStatus | "")}>
-            <option value="">Все</option>
-            <option value="open">Открытые</option>
-            <option value="done">Выполненные</option>
-            <option value="cancelled">Отменённые</option>
-          </select>
-        </label>
-      </div>
+      <FilterBar>
+        <Field label="Статус" style={{ width: 200 }}>
+          <Select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as TaskStatus | "")}
+            options={[
+              { value: "", label: "Все" },
+              { value: "open", label: "Открытые" },
+              { value: "done", label: "Выполненные" },
+              { value: "cancelled", label: "Отменённые" },
+            ]}
+          />
+        </Field>
+      </FilterBar>
 
-      {error && <p className="form-error">{error}</p>}
-      {loading && <p>Загрузка...</p>}
+      {error ? <FormMessage tone="error">{error}</FormMessage> : null}
+      {loading ? <p>Загрузка...</p> : null}
 
-      {data && (
-        <table className="leads-table">
-          <thead>
-            <tr>
-              <th>Заголовок</th>
-              <th>Lead ID</th>
-              <th>Статус</th>
-              <th>Дедлайн</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.items.map((task) => (
-              <tr key={task.id}>
-                <td>{task.title}</td>
-                <td>{task.lead_id.slice(0, 8)}...</td>
-                <td>
-                  <span className={`status-badge status-${task.status}`}>{task.status}</span>
-                </td>
-                <td>{task.due_at ? new Date(task.due_at).toLocaleString() : "—"}</td>
-                <td>
-                  {task.status === "open" && (
-                    <>
-                      <button onClick={() => updateStatus(task, "done")}>Готово</button>{" "}
-                      <button onClick={() => updateStatus(task, "cancelled")}>Отменить</button>
-                    </>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {data.items.length === 0 && (
-              <tr>
-                <td colSpan={5}>Задач не найдено</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      )}
+      {data ? (
+        <DataTable
+          rows={data.items}
+          rowKey={(r) => r.id}
+          emptyLabel="Задач не найдено"
+          columns={[
+            { key: "title", header: "Заголовок" },
+            { key: "lead_id", header: "Lead ID", mono: true, render: (r) => r.lead_id.slice(0, 8) + "…" },
+            { key: "status", header: "Статус", render: (r) => <Badge tone={TASK_STATUS_TONE[r.status]}>{TASK_STATUS_LABEL[r.status]}</Badge> },
+            { key: "due_at", header: "Дедлайн", mono: true, render: (r) => (r.due_at ? new Date(r.due_at).toLocaleString() : "—") },
+            {
+              key: "_actions",
+              header: "",
+              render: (r) =>
+                r.status === "open" ? (
+                  <div style={{ display: "flex", gap: "var(--space-3)" }}>
+                    <Button size="sm" variant="secondary" onClick={() => void updateStatus(r, "done")}>
+                      Готово
+                    </Button>
+                    <Button size="sm" variant="danger" onClick={() => void updateStatus(r, "cancelled")}>
+                      Отменить
+                    </Button>
+                  </div>
+                ) : null,
+            },
+          ]}
+        />
+      ) : null}
     </div>
   );
 }

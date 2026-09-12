@@ -1,0 +1,25 @@
+:root{
+/* Forest — primary. Growth, trust. */
+--green-900:#0E2A1E;--green-800:#143427;--green-700:#1B4332;--green-600:#2A5C46;--green-500:#3A7358;--green-400:#6F9B86;--green-200:#BFD3C8;--green-100:#E3EDE7;
+/* Graphite — stability, monolith. */
+--graphite-900:#1A1A1A;--graphite-800:#242424;--graphite-700:#333333;--graphite-600:#4D4D4D;--graphite-500:#6B6B6B;--graphite-400:#8E8B85;--graphite-300:#A8A6A1;
+/* Deep blue — second primary. Depth, analytics, trust. Carries the same weight as forest. */
+--navy-900:#002438;--navy-800:#003253;--navy-700:#00416A;--navy-600:#0A5687;--navy-500:#1B6EA5;--navy-400:#6E9DBC;--navy-200:#BBD1E0;--navy-100:#E3EDF4;
+/* Brass — ambition accent. Cap at 5-10% of any composition. */
+--gold-700:#8C700F;--gold-600:#A8861F;--gold-500:#C9A227;--gold-300:#E3CB78;--gold-100:#F4EBCF;
+/* Bone — ground, air. */
+--bone-50:#FAF9F6;--bone-100:#F5F3EE;--bone-200:#EAE7DF;--bone-300:#DCD8CE;--bone-400:#C6C1B4;
+--white:#FFFFFF;
+/* Semantic surfaces */
+--surface-page:var(--bone-100);--surface-card:var(--white);--surface-sunken:var(--bone-200);--surface-inverse:var(--graphite-900);--surface-brand:var(--green-700);--surface-brand-alt:var(--navy-700);--surface-brand-alt-soft:var(--navy-100);--surface-brand-soft:var(--green-100);--surface-accent-soft:var(--gold-100);
+/* Semantic text */
+--text-primary:var(--graphite-900);--text-secondary:var(--graphite-600);--text-muted:var(--graphite-500);--text-on-dark:var(--bone-100);--text-on-brand:var(--bone-100);--text-brand:var(--green-700);--text-brand-alt:var(--navy-700);--text-accent:var(--gold-700);--text-link:var(--green-700);--text-link-hover:var(--green-900);
+/* Semantic borders */
+--border-subtle:var(--bone-300);--border-default:var(--bone-400);--border-strong:var(--graphite-900);--border-brand:var(--green-700);--border-brand-alt:var(--navy-700);--border-accent:var(--gold-500);--focus-ring:var(--green-600);
+/* Status — muted by design; no neon, no alarm red */
+--status-positive:var(--green-600);--status-positive-soft:var(--green-100);--status-attention:var(--gold-600);--status-attention-soft:var(--gold-100);--status-critical:#8C3A2E;--status-critical-soft:#F3E3DF;--status-neutral:var(--graphite-500);--status-neutral-soft:var(--bone-200);
+/* Data viz — forest and navy alternate as the two series colours; brass marks the goal series. */
+--chart-1:var(--green-700);--chart-2:var(--navy-700);--chart-3:var(--green-500);--chart-4:var(--navy-500);--chart-accent:var(--gold-500);
+/* CRM lead pipeline — cool-to-warm progression along the funnel */
+--pipeline-new:var(--graphite-500);--pipeline-contacted:var(--navy-500);--pipeline-qualified:var(--navy-600);--pipeline-registered:var(--green-600);--pipeline-kyc:var(--gold-600);--pipeline-ftd:var(--green-700);--pipeline-active:var(--green-700);--pipeline-churned:var(--status-critical);--pipeline-unsubscribed:var(--graphite-400);
+}

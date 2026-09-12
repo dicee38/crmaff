@@ -1,0 +1,11 @@
+:root{
+--space-0:0;--space-1:2px;--space-2:4px;--space-3:8px;--space-4:12px;--space-5:16px;--space-6:20px;--space-7:24px;--space-8:32px;--space-9:40px;--space-10:56px;--space-11:72px;--space-12:96px;
+/* Radii — monolithic, small */
+--radius-none:0;--radius-xs:3px;--radius-sm:4px;--radius-md:6px;--radius-lg:10px;--radius-pill:999px;
+/* Borders */
+--border-width:1px;--border-width-strong:2px;--rule-width:1px;
+/* Layout */
+--layout-max:1180px;--layout-narrow:720px;--layout-gutter:24px;--header-height:60px;
+/* Controls */
+--control-height-sm:30px;--control-height-md:36px;--control-height-lg:44px;
+}

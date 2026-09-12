@@ -1,0 +1,11 @@
+:root{
+/* Borders carry the structure; shadows stay quiet. */
+--shadow-none:none;
+--shadow-xs:0 1px 2px rgba(26,26,26,0.05);
+--shadow-sm:0 2px 6px rgba(20,52,39,0.07);
+--shadow-md:0 8px 24px -6px rgba(20,52,39,0.14);
+--shadow-lg:0 24px 48px -12px rgba(14,42,30,0.22);
+--shadow-inset-hairline:inset 0 -1px 0 var(--border-subtle);
+--ring-focus:0 0 0 2px var(--bone-100),0 0 0 4px var(--focus-ring);
+--ring-accent:0 0 0 1px var(--gold-500);
+}

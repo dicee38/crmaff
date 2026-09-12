@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 import { api, ApiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { ARAB_COUNTRIES } from "../constants/geo";
+import { Button, DataTable, Field, FilterBar, FormMessage, Pagination, PageHeader, Select, StatusBadge } from "../ds";
 import type { Lead, LeadListResponse, LeadStatus } from "../types";
 
 const STATUS_OPTIONS: LeadStatus[] = [
@@ -21,6 +22,7 @@ const STATUS_OPTIONS: LeadStatus[] = [
 
 export function LeadsListPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const isAdmin = user?.role === "admin";
 
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -88,85 +90,63 @@ export function LeadsListPage() {
   }
 
   return (
-    <div className="page">
-      <h1>Лиды</h1>
+    <div>
+      <PageHeader eyebrow="Пайплайн" title="Лиды" />
 
-      <div className="filters">
-        <label>
-          GEO
-          <select value={geo} onChange={(e) => setGeo(e.target.value)}>
-            <option value="">Все</option>
-            {ARAB_COUNTRIES.map((c) => (
-              <option key={c.code} value={c.code}>
-                {c.name} ({c.code})
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Статус
-          <select value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">Все</option>
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      <FilterBar>
+        <Field label="GEO" style={{ width: 220 }}>
+          <Select
+            placeholder="Все"
+            value={geo}
+            onChange={(e) => setGeo(e.target.value)}
+            options={ARAB_COUNTRIES.map((c) => ({ value: c.code, label: `${c.name} (${c.code})` }))}
+          />
+        </Field>
+        <Field label="Статус" style={{ width: 200 }}>
+          <Select
+            placeholder="Все"
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            options={STATUS_OPTIONS.map((s) => ({ value: s, label: s }))}
+          />
+        </Field>
+      </FilterBar>
 
-      {error && <p className="form-error">{error}</p>}
-      {loading && <p>Загрузка...</p>}
+      {error ? <FormMessage tone="error">{error}</FormMessage> : null}
 
-      <table className="leads-table">
-        <thead>
-          <tr>
-            <th>Lead ID</th>
-            <th>GEO</th>
-            <th>Статус</th>
-            <th>Канал</th>
-            <th>Создан</th>
-            {isAdmin && <th></th>}
-          </tr>
-        </thead>
-        <tbody>
-          {leads.map((lead) => (
-            <tr key={lead.lead_id}>
-              <td>
-                <Link to={`/leads/${lead.lead_id}`}>{lead.lead_id.slice(0, 8)}...</Link>
-              </td>
-              <td>{lead.geo ?? "—"}</td>
-              <td>
-                <span className={`status-badge status-${lead.status}`}>{lead.status}</span>
-              </td>
-              <td>{lead.source_channel}</td>
-              <td>{new Date(lead.created_at).toLocaleString()}</td>
-              {isAdmin && (
-                <td>
-                  <button onClick={() => handleDelete(lead.lead_id)} className="danger-link">
-                    Удалить
-                  </button>
-                </td>
-              )}
-            </tr>
-          ))}
-          {!loading && leads.length === 0 && (
-            <tr>
-              <td colSpan={isAdmin ? 6 : 5}>Лидов не найдено</td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+      <DataTable
+        rows={leads}
+        rowKey={(r) => r.lead_id}
+        onRowClick={(r) => navigate(`/leads/${r.lead_id}`)}
+        emptyLabel={loading ? "Загрузка..." : "Лидов не найдено"}
+        columns={[
+          { key: "lead_id", header: "Lead ID", mono: true, render: (r) => r.lead_id.slice(0, 8) + "…" },
+          { key: "geo", header: "GEO", render: (r) => r.geo ?? "—" },
+          { key: "status", header: "Статус", render: (r) => <StatusBadge status={r.status} /> },
+          { key: "source_channel", header: "Канал" },
+          { key: "created_at", header: "Создан", mono: true, render: (r) => new Date(r.created_at).toLocaleString() },
+          ...(isAdmin
+            ? [
+                {
+                  key: "_delete",
+                  header: "",
+                  render: (r: Lead) => (
+                    <Button variant="danger" size="sm" onClick={() => void handleDelete(r.lead_id)}>
+                      Удалить
+                    </Button>
+                  ),
+                },
+              ]
+            : []),
+        ]}
+      />
 
-      <div className="pagination">
-        <button onClick={goPrev} disabled={cursorHistory.length === 0 && !cursor}>
-          Назад
-        </button>
-        <button onClick={goNext} disabled={!nextCursor}>
-          Вперёд
-        </button>
-      </div>
+      <Pagination
+        hasPrev={cursorHistory.length > 0 || !!cursor}
+        hasNext={!!nextCursor}
+        onPrev={goPrev}
+        onNext={goNext}
+      />
     </div>
   );
 }

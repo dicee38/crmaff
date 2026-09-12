@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import type { FormEvent } from "react";
-import { Link } from "react-router-dom";
+import type { CSSProperties, FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { api, ApiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
+import { Badge, Button, DataTable, Field, FilterBar, FormMessage, Input, KpiTile, PageHeader, Select } from "../ds";
 import type { ActionListResponse, ActionRow, Channel, ManualActionCreate, Partner } from "../types";
 
 const EVENT_TYPES = ["registration", "ftd", "deposit", "withdrawal", "chargeback"] as const;
@@ -25,6 +26,9 @@ const WARNING_LABELS: Record<string, string> = {
   possible_duplicate: "возможный дубль",
 };
 
+const kpiGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: "var(--space-4)", marginBottom: "var(--space-5)" };
+const formGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: "var(--space-5)", alignItems: "end" };
+
 function formatDate(iso: string): string {
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -33,6 +37,7 @@ function formatDate(iso: string): string {
 
 export function ActionsPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const isAdmin = user?.role === "admin";
 
   const [data, setData] = useState<ActionListResponse | null>(null);
@@ -127,188 +132,156 @@ export function ActionsPage() {
   }
 
   return (
-    <div className="page">
-      <h1>Действия (постбэки + ручной ввод)</h1>
+    <div>
+      <PageHeader eyebrow="Учёт" title="Действия" />
 
-      <section className="card-block">
-        <h2>Внести действие вручную</h2>
-        <form className="actions-form" onSubmit={handleSubmit}>
-          <label>
-            ID игрока (click_id или telegram_user_id)
-            <input
-              value={form.player_id}
-              onChange={(e) => setForm({ ...form, player_id: e.target.value })}
-              required
-            />
-          </label>
-          <label>
-            Партнёрская сеть
-            <select
-              value={form.partner_name}
-              onChange={(e) => setForm({ ...form, partner_name: e.target.value })}
-              required
-            >
-              <option value="" disabled>
-                Выберите...
-              </option>
-              {partners.map((p) => (
-                <option key={p.id} value={p.name}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Канал
-            <select value={form.channel} onChange={(e) => setForm({ ...form, channel: e.target.value })}>
-              <option value="">Без канала</option>
-              {channels.map((c) => (
-                <option key={c.id} value={c.name}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Тип действия
-            <select
-              value={form.event_type}
-              onChange={(e) => setForm({ ...form, event_type: e.target.value as ManualActionCreate["event_type"] })}
-            >
-              {EVENT_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {EVENT_TYPE_LABELS[t] ?? t}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Сумма {AMOUNT_REQUIRED.has(form.event_type) && <span className="required-mark">*</span>}
-            <input
-              type="number"
-              step="0.01"
-              value={form.amount}
-              onChange={(e) => setForm({ ...form, amount: e.target.value })}
-            />
-          </label>
-          {formError && <p className="form-error">{formError}</p>}
-          <button type="submit" disabled={submitting}>
-            {submitting ? "Сохранение..." : "Сохранить"}
-          </button>
+      <div style={{ background: "var(--surface-card)", border: "var(--border-width) solid var(--border-subtle)", borderRadius: "var(--radius-md)", padding: "var(--space-6)", marginBottom: "var(--space-6)" }}>
+        <h2 style={{ margin: "0 0 var(--space-5)", fontSize: "var(--text-micro)", fontWeight: "var(--weight-semibold)", letterSpacing: "var(--tracking-eyebrow)", textTransform: "uppercase", color: "var(--text-muted)" }}>
+          Внести действие вручную
+        </h2>
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
+          <div style={formGrid}>
+            <Field label="ID игрока" hint="click_id или telegram_user_id">
+              <Input value={form.player_id} onChange={(e) => setForm({ ...form, player_id: e.target.value })} required />
+            </Field>
+            <Field label="Партнёрская сеть">
+              <Select
+                placeholder="Выберите..."
+                value={form.partner_name}
+                onChange={(e) => setForm({ ...form, partner_name: e.target.value })}
+                options={partners.map((p) => ({ value: p.name, label: p.name }))}
+              />
+            </Field>
+            <Field label="Канал">
+              <Select
+                placeholder="Без канала"
+                value={form.channel}
+                onChange={(e) => setForm({ ...form, channel: e.target.value })}
+                options={channels.map((c) => ({ value: c.name, label: c.name }))}
+              />
+            </Field>
+            <Field label="Тип действия">
+              <Select
+                value={form.event_type}
+                onChange={(e) => setForm({ ...form, event_type: e.target.value as ManualActionCreate["event_type"] })}
+                options={EVENT_TYPES.map((t) => ({ value: t, label: EVENT_TYPE_LABELS[t] ?? t }))}
+              />
+            </Field>
+            <Field label="Сумма" required={AMOUNT_REQUIRED.has(form.event_type)}>
+              <Input type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+            </Field>
+          </div>
+          {formError ? <FormMessage tone="error">{formError}</FormMessage> : null}
+          {partners.length === 0 ? (
+            <FormMessage tone="hint">
+              Нет ни одной партнёрской сети в справочнике.{" "}
+              {isAdmin ? <a href="/admin" onClick={(e) => { e.preventDefault(); navigate("/admin"); }}>Добавьте её в админ-панели</a> : "Попросите администратора добавить её."}
+            </FormMessage>
+          ) : null}
+          <div>
+            <Button type="submit" disabled={submitting}>
+              {submitting ? "Сохранение..." : "Сохранить"}
+            </Button>
+          </div>
         </form>
-        {partners.length === 0 && (
-          <p className="empty-block">
-            Нет ни одной партнёрской сети в справочнике.{" "}
-            {isAdmin ? (
-              <Link to="/admin">Добавьте её в админ-панели</Link>
-            ) : (
-              "Попросите администратора добавить её."
-            )}
-          </p>
-        )}
-      </section>
-
-      <div className="filters">
-        <label>
-          Источник
-          <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
-            <option value="">Все</option>
-            <option value="api">Только API (postback)</option>
-            <option value="manual">Только ручные</option>
-          </select>
-        </label>
       </div>
 
-      {error && <p className="form-error">{error}</p>}
-      {loading && <p>Загрузка...</p>}
+      <FilterBar>
+        <Field label="Источник" style={{ width: 220 }}>
+          <Select
+            value={sourceFilter}
+            onChange={(e) => setSourceFilter(e.target.value)}
+            options={[
+              { value: "", label: "Все" },
+              { value: "api", label: "Только API (postback)" },
+              { value: "manual", label: "Только ручные" },
+            ]}
+          />
+        </Field>
+      </FilterBar>
 
-      {data && (
+      {error ? <FormMessage tone="error">{error}</FormMessage> : null}
+      {loading ? <p>Загрузка...</p> : null}
+
+      {data ? (
         <>
-          <div className="kpi-grid">
-            <div className="kpi-tile">
-              <span className="kpi-value">{data.aggregates.total_actions}</span>
-              <span className="kpi-label">Всего действий</span>
-            </div>
-            <div className="kpi-tile">
-              <span className="kpi-value">{data.aggregates.lead_count}</span>
-              <span className="kpi-label">Уникальных лидов</span>
-            </div>
-            <div className="kpi-tile">
-              <span className="kpi-value">{data.aggregates.deposit_count}</span>
-              <span className="kpi-label">Депозитов</span>
-            </div>
-            <div className="kpi-tile">
-              <span className="kpi-value">{data.aggregates.deposit_sum}</span>
-              <span className="kpi-label">Сумма депозитов</span>
-            </div>
+          <div style={kpiGrid}>
+            <KpiTile label="Всего действий" value={data.aggregates.total_actions} />
+            <KpiTile label="Уникальных лидов" value={data.aggregates.lead_count} />
+            <KpiTile label="Депозитов" value={data.aggregates.deposit_count} />
+            <KpiTile label="Сумма депозитов" value={data.aggregates.deposit_sum} unit="$" accent />
           </div>
 
-          <div className="table-scroll">
-            <table className="actions-table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Дата</th>
-                  <th>Партнёрская сеть</th>
-                  <th>Канал</th>
-                  <th>Тип действия</th>
-                  <th>ID игрока</th>
-                  <th>Сумма депозита</th>
-                  <th>Количество лидов</th>
-                  <th>МОП</th>
-                  <th>Предупреждения</th>
-                  <th>Ошибки</th>
-                  <th>Лид</th>
-                  {isAdmin && <th></th>}
-                </tr>
-              </thead>
-              <tbody>
-                {data.items.map((item) => (
-                  <tr key={item.id}>
-                    <td className="mono-cell" title={item.id}>
-                      {item.id.slice(0, 8)}
-                    </td>
-                    <td>{formatDate(item.received_at)}</td>
-                    <td>{item.partner}</td>
-                    <td>{item.channel ?? "—"}</td>
-                    <td>{EVENT_TYPE_LABELS[item.event_type] ?? item.event_type}</td>
-                    <td>{item.player_external_id ?? "—"}</td>
-                    <td>{item.amount != null ? `${item.amount} ${item.currency ?? ""}` : "—"}</td>
-                    <td>—</td>
-                    <td>
-                      {item.manager_full_name ? `${item.manager_full_name} — ${item.manager_role}` : "—"}
-                    </td>
-                    <td>
-                      {item.validation_flags &&
-                        Object.entries(item.validation_flags)
-                          .filter(([, v]) => v)
-                          .map(([key]) => (
-                            <span className="warning-badge" key={key}>
-                              {WARNING_LABELS[key] ?? key}
-                            </span>
-                          ))}
-                    </td>
-                    <td>—</td>
-                    <td>{item.lead_id && <Link to={`/leads/${item.lead_id}`}>лид</Link>}</td>
-                    {isAdmin && (
-                      <td>
-                        <button onClick={() => handleDelete(item.id)} className="danger-link">
+          <DataTable
+            rows={data.items}
+            rowKey={(r) => r.id}
+            emptyLabel="Действий не найдено"
+            columns={[
+              { key: "id", header: "ID", mono: true, render: (r) => r.id.slice(0, 8) },
+              { key: "received_at", header: "Дата", mono: true, render: (r) => formatDate(r.received_at) },
+              { key: "partner", header: "Партнёрская сеть" },
+              { key: "channel", header: "Канал", render: (r) => r.channel ?? "—" },
+              { key: "event_type", header: "Тип действия", render: (r) => EVENT_TYPE_LABELS[r.event_type] ?? r.event_type },
+              { key: "player_external_id", header: "ID игрока", mono: true, render: (r) => r.player_external_id ?? "—" },
+              {
+                key: "amount",
+                header: "Сумма депозита",
+                align: "right",
+                numeric: true,
+                render: (r) => (r.amount != null ? `${r.amount} ${r.currency ?? ""}` : "—"),
+              },
+              {
+                key: "manager_full_name",
+                header: "МОП",
+                render: (r) => (r.manager_full_name ? `${r.manager_full_name} — ${r.manager_role}` : "—"),
+              },
+              {
+                key: "validation_flags",
+                header: "Предупреждения",
+                render: (r) =>
+                  r.validation_flags ? (
+                    <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+                      {Object.entries(r.validation_flags)
+                        .filter(([, v]) => v)
+                        .map(([key]) => (
+                          <Badge key={key} tone="attention">
+                            {WARNING_LABELS[key] ?? key}
+                          </Badge>
+                        ))}
+                    </div>
+                  ) : (
+                    "—"
+                  ),
+              },
+              {
+                key: "lead_id",
+                header: "Лид",
+                render: (r) =>
+                  r.lead_id ? (
+                    <a href={`/leads/${r.lead_id}`} onClick={(e) => { e.preventDefault(); navigate(`/leads/${r.lead_id}`); }}>
+                      лид
+                    </a>
+                  ) : (
+                    "—"
+                  ),
+              },
+              ...(isAdmin
+                ? [
+                    {
+                      key: "_delete",
+                      header: "",
+                      render: (r: ActionRow) => (
+                        <Button variant="danger" size="sm" onClick={() => void handleDelete(r.id)}>
                           Удалить
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-                {data.items.length === 0 && (
-                  <tr>
-                    <td colSpan={isAdmin ? 13 : 12}>Действий не найдено</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                        </Button>
+                      ),
+                    },
+                  ]
+                : []),
+            ]}
+          />
         </>
-      )}
+      ) : null}
     </div>
   );
 }
